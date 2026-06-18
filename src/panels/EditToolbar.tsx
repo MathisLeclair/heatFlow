@@ -64,7 +64,7 @@ export function EditToolbar() {
         >
           {WINDOW_PRESETS.map((p) => (
             <MenuItem key={p.id} value={p.id}>
-              {p.name} · {p.widthM}×{p.heightM} m
+              {p.name}
             </MenuItem>
           ))}
         </TextField>
@@ -79,7 +79,7 @@ export function EditToolbar() {
         >
           {DOOR_PRESETS.map((p) => (
             <MenuItem key={p.id} value={p.id}>
-              {p.name} · {p.widthM}×{p.heightM} m
+              {p.name}
             </MenuItem>
           ))}
         </TextField>
@@ -103,6 +103,6 @@ function hintFor(tool: Tool): string {
     case 'add-door':
       return 'Click on a wall (interior walls connect rooms) to place a door.'
     default:
-      return 'Click a room, wall, or opening to edit it. Drag a selected room’s corner handles to reshape it.'
+      return "Click a room, wall, or opening to edit it. Drag a selected room's corner handles to reshape it."
   }
 }

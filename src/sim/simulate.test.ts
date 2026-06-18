@@ -31,6 +31,7 @@ function openingOnWall(wall: Wall, isOpen: boolean): Opening {
     kind: 'window',
     wallId: wall.id,
     presetId: 'window-double',
+    sizePresetId: 'win-sz-standard',
     t: 0.5,
     widthM: 1.2,
     heightM: 1.2,
