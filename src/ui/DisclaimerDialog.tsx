@@ -7,6 +7,7 @@ import {
   Typography,
   Alert,
 } from '@mui/material'
+import { useTranslation } from 'react-i18next'
 
 export function DisclaimerDialog({
   open,
@@ -15,39 +16,38 @@ export function DisclaimerDialog({
   open: boolean
   onClose: () => void
 }) {
+  const { t } = useTranslation()
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm">
-      <DialogTitle>How HeatFlow works</DialogTitle>
+      <DialogTitle>{t('disclaimer.title')}</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" paragraph>
-          HeatFlow models each room as a lumped thermal mass. Heat moves between rooms
-          and the outside in three ways:
+          {t('disclaimer.intro')}
         </Typography>
         <Typography variant="body2" component="ul" sx={{ pl: 2 }}>
           <li>
-            <b>Conduction</b> through walls and closed windows/doors, set by their
-            R/U-value and area.
+            <b>{t('disclaimer.conduction')}</b>{' '}
+            {t('disclaimer.conductionDesc')}
           </li>
           <li>
-            <b>Ventilation</b> through open windows/doors, driven by the temperature
-            difference (buoyancy/stack effect) plus a small background breeze.
+            <b>{t('disclaimer.ventilation')}</b>{' '}
+            {t('disclaimer.ventilationDesc')}
           </li>
           <li>
-            <b>Mixing</b> between rooms through open interior doors.
+            <b>{t('disclaimer.mixing')}</b>{' '}
+            {t('disclaimer.mixingDesc')}
           </li>
         </Typography>
         <Typography variant="body2" paragraph sx={{ mt: 1 }}>
-          The simulation steps temperatures forward over time, so you can see slow
-          effects like overnight cooling and thermal mass.
+          {t('disclaimer.timeNote')}
         </Typography>
         <Alert severity="info">
-          These are engineering estimates to build intuition, not a certified
-          building-energy or CFD calculation. Wind direction, detailed shading, and
-          humidity are not modelled.
+          {t('disclaimer.disclaimer')}
         </Alert>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Got it</Button>
+        <Button onClick={onClose}>{t('disclaimer.gotIt')}</Button>
       </DialogActions>
     </Dialog>
   )

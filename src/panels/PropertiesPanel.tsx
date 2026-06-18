@@ -13,6 +13,7 @@ import {
   Chip,
 } from '@mui/material'
 import DeleteIcon from '@mui/icons-material/Delete'
+import { useTranslation } from 'react-i18next'
 import { useProjectStore } from '../state/projectStore'
 import { useUiStore } from '../state/uiStore'
 import {
@@ -27,14 +28,14 @@ import {
 import type { OutsideZone, Room, Wall, Opening } from '../model/types'
 
 export function PropertiesPanel() {
+  const { t } = useTranslation()
   const selection = useUiStore((s) => s.selection)
   const project = useProjectStore((s) => s.project)
 
   if (!selection) {
     return (
       <Typography variant="body2" color="text.secondary">
-        Nothing selected. Pick a room, wall, opening, or outside zone to edit its
-        properties.
+        {t('properties.nothingSelected')}
       </Typography>
     )
   }
@@ -63,37 +64,37 @@ function num(e: { target: { value: string } }): number {
 }
 
 function RoomEditor({ room }: { room: Room }) {
+  const { t } = useTranslation()
   const updateRoom = useProjectStore((s) => s.updateRoom)
   const removeRoom = useProjectStore((s) => s.removeRoom)
   const select = useUiStore((s) => s.select)
 
   return (
     <Stack spacing={2}>
-      <Typography variant="subtitle2">Room</Typography>
+      <Typography variant="subtitle2">{t('room.title')}</Typography>
       <TextField
         size="small"
-        label="Name"
+        label={t('room.name')}
         value={room.name}
         onChange={(e) => updateRoom(room.id, { name: e.target.value })}
       />
       <TextField
         size="small"
         type="number"
-        label="Current air temperature (°C)"
+        label={t('room.airTemp')}
         value={room.initialTempC}
         onChange={(e) => updateRoom(room.id, { initialTempC: num(e) })}
       />
       <TextField
         size="small"
         type="number"
-        label="Ceiling height (m)"
+        label={t('room.ceilingHeight')}
         value={room.ceilingHeightM}
         onChange={(e) => updateRoom(room.id, { ceilingHeightM: num(e) })}
       />
       <Box>
         <Typography variant="caption" color="text.secondary">
-          Thermal mass (how slowly the room changes temperature):{' '}
-          {room.thermalMassMultiplier}×
+          {t('room.thermalMass')} {room.thermalMassMultiplier}×
         </Typography>
         <Slider
           size="small"
@@ -114,13 +115,14 @@ function RoomEditor({ room }: { room: Room }) {
           select(null)
         }}
       >
-        Delete room
+        {t('room.delete')}
       </Button>
     </Stack>
   )
 }
 
 function WallEditor({ wall }: { wall: Wall }) {
+  const { t } = useTranslation()
   const updateWall = useProjectStore((s) => s.updateWall)
   const resizeWall = useProjectStore((s) => s.resizeWall)
   const project = useProjectStore((s) => s.project)
@@ -129,8 +131,6 @@ function WallEditor({ wall }: { wall: Wall }) {
   const outsideZones = project.outsideZones
   const currentLen = Math.hypot(wall.b.x - wall.a.x, wall.b.y - wall.a.y)
 
-  // Lazy init so it doesn't reset on every re-render. The chip always shows
-  // the live value; the input is only for typing a new precise length.
   const [lenInput, setLenInput] = useState(() => currentLen.toFixed(2))
 
   function commitLength() {
@@ -143,7 +143,7 @@ function WallEditor({ wall }: { wall: Wall }) {
   return (
     <Stack spacing={2}>
       <Typography variant="subtitle2">
-        {wall.exterior ? 'Exterior wall' : 'Interior wall'}
+        {wall.exterior ? t('wall.exterior') : t('wall.interior')}
       </Typography>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
         <Chip
@@ -160,45 +160,45 @@ function WallEditor({ wall }: { wall: Wall }) {
       </Box>
       <TextField
         size="small"
-        label="Length (m)"
+        label={t('wall.length')}
         value={lenInput}
         onChange={(e) => setLenInput(e.target.value)}
         onBlur={commitLength}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
         slotProps={{ htmlInput: { inputMode: 'decimal', step: '0.05' } }}
-        helperText="Moves the far endpoint; adjacent walls adjust."
+        helperText={t('wall.lengthHelper')}
       />
       <TextField
         select
         size="small"
-        label="Construction"
+        label={t('wall.construction')}
         value={wall.wallTypeId}
         onChange={(e) => {
-          const t = wallTypeById(e.target.value)
+          const wt = wallTypeById(e.target.value)
           updateWall(wall.id, {
             wallTypeId: e.target.value,
-            thicknessM: t.thicknessOptions.includes(wall.thicknessM)
+            thicknessM: wt.thicknessOptions.includes(wall.thicknessM)
               ? wall.thicknessM
-              : t.refThicknessM,
+              : wt.refThicknessM,
           })
         }}
       >
-        {WALL_TYPES.map((t) => (
-          <MenuItem key={t.id} value={t.id}>
-            {t.name}
+        {WALL_TYPES.map((wt) => (
+          <MenuItem key={wt.id} value={wt.id}>
+            {wt.name}
           </MenuItem>
         ))}
       </TextField>
       <TextField
         select
         size="small"
-        label="Thickness (m)"
+        label={t('wall.thickness')}
         value={wall.thicknessM}
         onChange={(e) => updateWall(wall.id, { thicknessM: Number(e.target.value) })}
       >
-        {type.thicknessOptions.map((t) => (
-          <MenuItem key={t} value={t}>
-            {t} m
+        {type.thicknessOptions.map((th) => (
+          <MenuItem key={th} value={th}>
+            {th} m
           </MenuItem>
         ))}
       </TextField>
@@ -207,7 +207,7 @@ function WallEditor({ wall }: { wall: Wall }) {
         <TextField
           select
           size="small"
-          label="Faces outside zone"
+          label={t('wall.facesZone')}
           value={wall.sideB.type === 'outside' ? wall.sideB.id : ''}
           onChange={(e) =>
             updateWall(wall.id, { sideB: { type: 'outside', id: e.target.value } })
@@ -225,6 +225,7 @@ function WallEditor({ wall }: { wall: Wall }) {
 }
 
 function OpeningEditor({ opening }: { opening: Opening }) {
+  const { t } = useTranslation()
   const updateOpening = useProjectStore((s) => s.updateOpening)
   const removeOpening = useProjectStore((s) => s.removeOpening)
   const select = useUiStore((s) => s.select)
@@ -235,7 +236,7 @@ function OpeningEditor({ opening }: { opening: Opening }) {
   return (
     <Stack spacing={2}>
       <Typography variant="subtitle2">
-        {opening.kind === 'window' ? 'Window' : 'Door'}
+        {opening.kind === 'window' ? t('opening.titleWindow') : t('opening.titleDoor')}
       </Typography>
       <FormControlLabel
         control={
@@ -244,12 +245,12 @@ function OpeningEditor({ opening }: { opening: Opening }) {
             onChange={(e) => updateOpening(opening.id, { isOpen: e.target.checked })}
           />
         }
-        label={opening.isOpen ? 'Open' : 'Closed'}
+        label={opening.isOpen ? t('opening.isOpen') : t('opening.isClosed')}
       />
       <TextField
         select
         size="small"
-        label="Glazing / insulation"
+        label={t('opening.glazing')}
         value={opening.presetId}
         onChange={(e) => updateOpening(opening.id, { presetId: e.target.value })}
       >
@@ -262,7 +263,7 @@ function OpeningEditor({ opening }: { opening: Opening }) {
       <TextField
         select
         size="small"
-        label="Size"
+        label={t('opening.size')}
         value={opening.sizePresetId ?? ''}
         onChange={(e) => updateOpening(opening.id, { sizePresetId: e.target.value })}
       >
@@ -275,27 +276,27 @@ function OpeningEditor({ opening }: { opening: Opening }) {
       <TextField
         size="small"
         type="number"
-        label="Width (m)"
+        label={t('opening.width')}
         value={opening.widthM}
         onChange={(e) => updateOpening(opening.id, { widthM: num(e) })}
       />
       <TextField
         size="small"
         type="number"
-        label="Height (m)"
+        label={t('opening.height')}
         value={opening.heightM}
         onChange={(e) => updateOpening(opening.id, { heightM: num(e) })}
       />
       <TextField
         size="small"
         type="number"
-        label="Sill height above floor (m)"
+        label={t('opening.sillHeight')}
         value={opening.sillHeightM}
         onChange={(e) => updateOpening(opening.id, { sillHeightM: num(e) })}
       />
       <Box>
         <Typography variant="caption" color="text.secondary">
-          Position along wall
+          {t('opening.positionAlongWall')}
         </Typography>
         <Slider
           size="small"
@@ -314,26 +315,34 @@ function OpeningEditor({ opening }: { opening: Opening }) {
           select(null)
         }}
       >
-        Delete opening
+        {t('opening.delete')}
       </Button>
     </Stack>
   )
 }
 
 function ZoneEditor({ zone }: { zone: OutsideZone }) {
+  const { t } = useTranslation()
   const updateZone = useProjectStore((s) => s.updateZone)
   const removeZone = useProjectStore((s) => s.removeZone)
   const select = useUiStore((s) => s.select)
   const useDiurnal = !!zone.diurnal
 
+  const shelterLabel =
+    zone.shelterFactor == null || zone.shelterFactor === 0
+      ? t('zone.shelterOpen')
+      : zone.shelterFactor >= 1
+        ? t('zone.shelterFull')
+        : t('zone.shelterPartial', { pct: Math.round((zone.shelterFactor ?? 0) * 100) })
+
   return (
     <Stack spacing={2}>
       <Typography variant="subtitle2">
-        Outside zone {zone.kind === 'global' ? '(global)' : ''}
+        {zone.kind === 'global' ? t('zone.titleGlobal') : t('zone.titleCustom')}
       </Typography>
       <TextField
         size="small"
-        label="Name"
+        label={t('zone.name')}
         value={zone.name}
         onChange={(e) => updateZone(zone.id, { name: e.target.value })}
       />
@@ -350,13 +359,13 @@ function ZoneEditor({ zone }: { zone: OutsideZone }) {
             }
           />
         }
-        label="Day/night temperature swing"
+        label={t('zone.diurnalSwing')}
       />
       {!useDiurnal && (
         <TextField
           size="small"
           type="number"
-          label="Temperature (°C)"
+          label={t('zone.temperature')}
           value={zone.tempC}
           onChange={(e) => updateZone(zone.id, { tempC: num(e) })}
         />
@@ -366,7 +375,7 @@ function ZoneEditor({ zone }: { zone: OutsideZone }) {
           <TextField
             size="small"
             type="number"
-            label="Night low (°C)"
+            label={t('zone.nightLow')}
             value={zone.diurnal.minC}
             onChange={(e) =>
               updateZone(zone.id, { diurnal: { ...zone.diurnal!, minC: num(e) } })
@@ -375,7 +384,7 @@ function ZoneEditor({ zone }: { zone: OutsideZone }) {
           <TextField
             size="small"
             type="number"
-            label="Day high (°C)"
+            label={t('zone.dayHigh')}
             value={zone.diurnal.maxC}
             onChange={(e) =>
               updateZone(zone.id, { diurnal: { ...zone.diurnal!, maxC: num(e) } })
@@ -384,7 +393,7 @@ function ZoneEditor({ zone }: { zone: OutsideZone }) {
           <TextField
             size="small"
             type="number"
-            label="Hour of peak heat (0–24)"
+            label={t('zone.peakHeatHour')}
             value={zone.diurnal.peakHour}
             onChange={(e) =>
               updateZone(zone.id, { diurnal: { ...zone.diurnal!, peakHour: num(e) } })
@@ -394,12 +403,7 @@ function ZoneEditor({ zone }: { zone: OutsideZone }) {
       )}
       <Box>
         <Typography variant="caption" color="text.secondary">
-          Enclosure / shelter:{' '}
-          {zone.shelterFactor == null || zone.shelterFactor === 0
-            ? 'Open air'
-            : zone.shelterFactor >= 1
-              ? 'Fully walled'
-              : `${Math.round((zone.shelterFactor ?? 0) * 100)}% sheltered`}
+          {t('zone.shelter')} {shelterLabel}
         </Typography>
         <Slider
           size="small"
@@ -410,7 +414,7 @@ function ZoneEditor({ zone }: { zone: OutsideZone }) {
           onChange={(_, v) => updateZone(zone.id, { shelterFactor: v as number })}
         />
         <Typography variant="caption" color="text.secondary">
-          Reduces ambient wind reaching openings that face this zone (e.g. walled courtyard).
+          {t('zone.shelterHelper')}
         </Typography>
       </Box>
       {zone.kind !== 'global' && (
@@ -424,7 +428,7 @@ function ZoneEditor({ zone }: { zone: OutsideZone }) {
               select(null)
             }}
           >
-            Delete zone
+            {t('zone.delete')}
           </Button>
         </>
       )}

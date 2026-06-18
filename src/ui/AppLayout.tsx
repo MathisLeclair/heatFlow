@@ -35,6 +35,8 @@ import NearMeIcon from '@mui/icons-material/NearMe'
 import PentagonIcon from '@mui/icons-material/Pentagon'
 import WindowIcon from '@mui/icons-material/Window'
 import DoorFrontIcon from '@mui/icons-material/DoorFront'
+import { useTranslation } from 'react-i18next'
+import { changeLanguage } from '../i18n'
 import { useUiStore, type Tool } from '../state/uiStore'
 import { useProjectStore } from '../state/projectStore'
 import { useSimStore } from '../state/simStore'
@@ -54,6 +56,7 @@ import { zoneTempAt } from '../sim/simulate'
 import type { Project, Wall } from '../model/types'
 
 export function AppLayout() {
+  const { t, i18n } = useTranslation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const mode = useUiStore((s) => s.mode)
@@ -84,26 +87,26 @@ export function AppLayout() {
     >
       {mode === 'edit' ? (
         <Stack divider={<Divider />}>
-          <PanelSection title="Properties">
+          <PanelSection title={t('panel.properties')}>
             <PropertiesPanel />
           </PanelSection>
-          <PanelSection title="Outside environment">
+          <PanelSection title={t('panel.outsideEnv')}>
             <OutsideEnvSection />
           </PanelSection>
-          <PanelSection title="Openings">
+          <PanelSection title={t('panel.openings')}>
             <OpeningsListSection />
           </PanelSection>
-          <PanelSection title="Layouts">
+          <PanelSection title={t('panel.layouts')}>
             <LayoutsPanel />
           </PanelSection>
         </Stack>
       ) : (
         <Stack divider={<Divider />}>
           <SimulatePanel />
-          <PanelSection title="Scenarios">
+          <PanelSection title={t('panel.scenarios')}>
             <ScenariosPanel />
           </PanelSection>
-          <PanelSection title="Temperature over time">
+          <PanelSection title={t('panel.tempOverTime')}>
             <Box sx={{ height: 200 }}>
               <TempChart />
             </Box>
@@ -154,10 +157,10 @@ export function AppLayout() {
             }}
           >
             <ToggleButton value="edit" disableRipple>
-              Edit
+              {t('mode.edit')}
             </ToggleButton>
             <ToggleButton value="simulate" disableRipple>
-              Simulate
+              {t('mode.simulate')}
             </ToggleButton>
           </ToggleButtonGroup>
 
@@ -172,7 +175,7 @@ export function AppLayout() {
               setMode('edit')
             }}
           >
-            Sample
+            {t('header.sample')}
           </Button>
           <Button
             size="small"
@@ -183,10 +186,30 @@ export function AppLayout() {
               setMode('edit')
             }}
           >
-            Blank
+            {t('header.blank')}
           </Button>
 
-          <Tooltip title={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+          {/* Language switcher */}
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Button
+              size="small"
+              variant={i18n.language === 'en' ? 'contained' : 'outlined'}
+              sx={{ minWidth: 0, fontSize: 11, px: 1, py: 0.25, borderRadius: 2 }}
+              onClick={() => changeLanguage('en')}
+            >
+              EN
+            </Button>
+            <Button
+              size="small"
+              variant={i18n.language === 'fr' ? 'contained' : 'outlined'}
+              sx={{ minWidth: 0, fontSize: 11, px: 1, py: 0.25, borderRadius: 2 }}
+              onClick={() => changeLanguage('fr')}
+            >
+              FR
+            </Button>
+          </Box>
+
+          <Tooltip title={themeMode === 'dark' ? t('header.lightMode') : t('header.darkMode')}>
             <IconButton size="small" onClick={toggleTheme} color="inherit">
               {themeMode === 'dark' ? (
                 <LightModeIcon fontSize="small" />
@@ -196,12 +219,12 @@ export function AppLayout() {
             </IconButton>
           </Tooltip>
 
-          <Tooltip title="Tutorial">
+          <Tooltip title={t('header.tutorial')}>
             <IconButton size="small" onClick={() => setOnboardingOpen(true)} color="inherit">
               <HelpOutlineIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="About the model">
+          <Tooltip title={t('header.aboutModel')}>
             <IconButton size="small" onClick={() => setInfoOpen(true)} color="inherit">
               <InfoOutlinedIcon fontSize="small" />
             </IconButton>
@@ -267,6 +290,7 @@ function PanelSection({
 }
 
 function ToolPaletteOverlay() {
+  const { t } = useTranslation()
   const theme = useTheme()
   const tool = useUiStore((s) => s.tool)
   const setTool = useUiStore((s) => s.setTool)
@@ -276,11 +300,20 @@ function ToolPaletteOverlay() {
   const setPendingDoorPreset = useUiStore((s) => s.setPendingDoorPreset)
 
   const tools: { value: Tool; icon: React.ReactNode; label: string }[] = [
-    { value: 'select', icon: <NearMeIcon fontSize="small" />, label: 'Select' },
-    { value: 'draw-room', icon: <PentagonIcon fontSize="small" />, label: 'Draw room' },
-    { value: 'add-window', icon: <WindowIcon fontSize="small" />, label: 'Add window' },
-    { value: 'add-door', icon: <DoorFrontIcon fontSize="small" />, label: 'Add door' },
+    { value: 'select', icon: <NearMeIcon fontSize="small" />, label: t('tool.select') },
+    { value: 'draw-room', icon: <PentagonIcon fontSize="small" />, label: t('tool.drawRoom') },
+    { value: 'add-window', icon: <WindowIcon fontSize="small" />, label: t('tool.addWindow') },
+    { value: 'add-door', icon: <DoorFrontIcon fontSize="small" />, label: t('tool.addDoor') },
   ]
+
+  function hintFor(currentTool: Tool): string {
+    switch (currentTool) {
+      case 'draw-room': return t('tool.hintDrawRoom')
+      case 'add-window': return t('tool.hintAddWindow')
+      case 'add-door': return t('tool.hintAddDoor')
+      default: return t('tool.hintSelect')
+    }
+  }
 
   return (
     <Box
@@ -351,7 +384,7 @@ function ToolPaletteOverlay() {
             select
             size="small"
             fullWidth
-            label={tool === 'add-window' ? 'Window type' : 'Door type'}
+            label={tool === 'add-window' ? t('tool.windowType') : t('tool.doorType')}
             value={tool === 'add-window' ? pendingWindowPreset : pendingDoorPreset}
             onChange={(e) =>
               tool === 'add-window'
@@ -367,6 +400,25 @@ function ToolPaletteOverlay() {
           </TextField>
         </Paper>
       )}
+
+      {/* Tool hint bubble */}
+      <Paper
+        elevation={2}
+        sx={{
+          p: 1,
+          borderRadius: 2,
+          maxWidth: 200,
+          backdropFilter: 'blur(8px)',
+          bgcolor:
+            theme.palette.mode === 'dark'
+              ? 'rgba(18,24,38,0.75)'
+              : 'rgba(255,255,255,0.80)',
+        }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          {hintFor(tool)}
+        </Typography>
+      </Paper>
     </Box>
   )
 }
@@ -508,6 +560,7 @@ function TimelineBar() {
 }
 
 function OutsideEnvSection() {
+  const { t } = useTranslation()
   const globalZone = useProjectStore((s) =>
     s.project.outsideZones.find((z) => z.kind === 'global'),
   )
@@ -518,7 +571,7 @@ function OutsideEnvSection() {
   if (!globalZone)
     return (
       <Typography variant="body2" color="text.secondary">
-        No outside zone.
+        {t('outside.noZone')}
       </Typography>
     )
 
@@ -542,7 +595,7 @@ function OutsideEnvSection() {
             }}
           />
         }
-        label={<Typography variant="body2">Daily swing</Typography>}
+        label={<Typography variant="body2">{t('outside.dailySwing')}</Typography>}
       />
       {d ? (
         <Stack spacing={1}>
@@ -550,7 +603,7 @@ function OutsideEnvSection() {
             <TextField
               size="small"
               type="number"
-              label="Night low (°C)"
+              label={t('outside.nightLow')}
               value={d.minC}
               onChange={(e) =>
                 updateZone(globalZone.id, { diurnal: { ...d, minC: Number(e.target.value) } })
@@ -560,7 +613,7 @@ function OutsideEnvSection() {
             <TextField
               size="small"
               type="number"
-              label="Day high (°C)"
+              label={t('outside.dayHigh')}
               value={d.maxC}
               onChange={(e) =>
                 updateZone(globalZone.id, { diurnal: { ...d, maxC: Number(e.target.value) } })
@@ -571,7 +624,7 @@ function OutsideEnvSection() {
           <TextField
             size="small"
             type="number"
-            label="Peak hour (0–23)"
+            label={t('outside.peakHour')}
             value={d.peakHour}
             onChange={(e) =>
               updateZone(globalZone.id, {
@@ -584,27 +637,27 @@ function OutsideEnvSection() {
         <TextField
           size="small"
           type="number"
-          label="Temperature (°C)"
+          label={t('outside.temperature')}
           value={globalZone.tempC}
           onChange={(e) => updateZone(globalZone.id, { tempC: Number(e.target.value) })}
         />
       )}
       <Divider />
       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-        Sun / orientation
+        {t('outside.sunOrientation')}
       </Typography>
       <Stack direction="row" spacing={1} alignItems="flex-start">
         <TextField
           size="small"
           type="number"
-          label="Start hour"
+          label={t('outside.startHour')}
           value={project.startHour ?? 6}
           onChange={(e) => setStartHour(Math.max(0, Math.min(23, Number(e.target.value))))}
-          helperText="Hour of day sim begins"
+          helperText={t('outside.startHourHelper')}
           sx={{ flex: 1 }}
         />
         <Typography variant="caption" color="text.secondary" sx={{ flex: 1, pt: 1 }}>
-          Drag the compass on the canvas to set north direction.
+          {t('outside.compassHint')}
         </Typography>
       </Stack>
     </Stack>
@@ -612,6 +665,7 @@ function OutsideEnvSection() {
 }
 
 function OpeningsListSection() {
+  const { t } = useTranslation()
   const project = useProjectStore((s) => s.project)
   const setAllOpen = useProjectStore((s) => s.setAllOpen)
   const updateOpening = useProjectStore((s) => s.updateOpening)
@@ -619,7 +673,7 @@ function OpeningsListSection() {
   if (project.openings.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary">
-        No openings yet — draw rooms, then add windows or doors.
+        {t('openings.empty')}
       </Typography>
     )
   }
@@ -628,10 +682,10 @@ function OpeningsListSection() {
     <Stack spacing={1}>
       <Stack direction="row" spacing={1}>
         <Button size="small" onClick={() => setAllOpen(true)}>
-          Open all
+          {t('openings.openAll')}
         </Button>
         <Button size="small" onClick={() => setAllOpen(false)}>
-          Close all
+          {t('openings.closeAll')}
         </Button>
       </Stack>
       <List dense disablePadding sx={{ maxHeight: 200, overflow: 'auto' }}>
@@ -652,7 +706,7 @@ function OpeningsListSection() {
               }
             >
               <ListItemText
-                primary={`${o.kind === 'window' ? 'Window' : 'Door'} · ${roomName}`}
+                primary={`${o.kind === 'window' ? t('openings.window') : t('openings.door')} · ${roomName}`}
                 primaryTypographyProps={{ variant: 'body2' }}
               />
             </ListItem>

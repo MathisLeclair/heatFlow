@@ -14,8 +14,6 @@ const CROSS_VENT_BOOST = 1.6
 const I_DIRECT = 800
 /** Peak sun elevation above horizon for mid-latitude summer (degrees). */
 const PEAK_SUN_ELEVATION_DEG = 60
-/** Exterior surface film resistance used for the sol-air model (m²·K/W). */
-const R_EXT_FILM = 0.04
 
 export interface SimResult {
   /** Timestamps in hours from start. */

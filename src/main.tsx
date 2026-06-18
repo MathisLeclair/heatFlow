@@ -6,6 +6,7 @@ import { createAppTheme } from './theme'
 import { useUiStore } from './state/uiStore'
 import App from './App.tsx'
 import './index.css'
+import './i18n'
 
 // eslint-disable-next-line react-refresh/only-export-components
 function ThemedApp() {

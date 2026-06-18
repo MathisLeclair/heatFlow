@@ -12,6 +12,7 @@ import {
 } from '@mui/material'
 import SaveIcon from '@mui/icons-material/Save'
 import DeleteIcon from '@mui/icons-material/Delete'
+import { useTranslation } from 'react-i18next'
 import { useProjectStore } from '../state/projectStore'
 
 /**
@@ -19,6 +20,7 @@ import { useProjectStore } from '../state/projectStore'
  * later, so the user can A/B compare strategies by applying then re-running.
  */
 export function ScenariosPanel() {
+  const { t } = useTranslation()
   const scenarios = useProjectStore((s) => s.project.scenarios)
   const openings = useProjectStore((s) => s.project.openings)
   const saveScenario = useProjectStore((s) => s.saveScenario)
@@ -28,12 +30,11 @@ export function ScenariosPanel() {
 
   return (
     <Stack spacing={1.5}>
-      <Typography variant="subtitle2">Scenarios</Typography>
       <Stack direction="row" spacing={1}>
         <TextField
           size="small"
           fullWidth
-          placeholder="e.g. Night cross-vent"
+          placeholder={t('scenarios.placeholder')}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -45,13 +46,12 @@ export function ScenariosPanel() {
             setName('')
           }}
         >
-          Save
+          {t('scenarios.save')}
         </Button>
       </Stack>
       {scenarios.length === 0 ? (
         <Typography variant="caption" color="text.secondary">
-          Save the current open/closed layout to compare strategies. Apply one, then
-          re-run the simulation to see its score.
+          {t('scenarios.hint')}
         </Typography>
       ) : (
         <List dense disablePadding>
@@ -74,7 +74,7 @@ export function ScenariosPanel() {
                 <ListItemButton onClick={() => applyScenario(sc.id)}>
                   <ListItemText
                     primary={sc.name}
-                    secondary={`${open}/${openings.length} open — tap to apply`}
+                    secondary={t('scenarios.openCount', { open, total: openings.length })}
                     slotProps={{
                       primary: { variant: 'body2' },
                       secondary: { variant: 'caption' },

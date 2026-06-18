@@ -3,6 +3,7 @@ import { Stack, TextField, Typography, Button, Divider } from '@mui/material'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import FileUploadIcon from '@mui/icons-material/FileUpload'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
+import { useTranslation } from 'react-i18next'
 import { useProjectStore } from '../state/projectStore'
 import {
   exportProjectFile,
@@ -10,6 +11,7 @@ import {
 } from '../persistence/storage'
 
 export function ProjectSettingsPanel() {
+  const { t } = useTranslation()
   const project = useProjectStore((s) => s.project)
   const setName = useProjectStore((s) => s.setName)
   const setComfortTempC = useProjectStore((s) => s.setComfortTempC)
@@ -22,54 +24,54 @@ export function ProjectSettingsPanel() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="subtitle2">Project</Typography>
+      <Typography variant="subtitle2">{t('project.title')}</Typography>
       <TextField
         size="small"
-        label="Name"
+        label={t('project.name')}
         value={project.name}
         onChange={(e) => setName(e.target.value)}
       />
       <TextField
         size="small"
         type="number"
-        label="Comfort temperature (°C)"
+        label={t('project.comfortTemp')}
         value={project.comfortTempC}
         onChange={(e) => setComfortTempC(Number(e.target.value))}
-        helperText="Used for the cooling score."
+        helperText={t('project.comfortTempHelper')}
       />
       <TextField
         size="small"
         type="number"
-        label="Simulation length (hours)"
+        label={t('project.simLength')}
         value={project.simHours}
         onChange={(e) => setSimHours(Math.max(1, Number(e.target.value)))}
       />
 
       <Divider />
-      <Typography variant="subtitle2">Solar / Orientation</Typography>
+      <Typography variant="subtitle2">{t('project.solarSection')}</Typography>
       <TextField
         size="small"
         type="number"
-        label="Simulation start hour (0–23)"
+        label={t('project.startHour')}
         value={project.startHour ?? 6}
         onChange={(e) => setStartHour(Math.max(0, Math.min(23, Number(e.target.value))))}
-        helperText="Hour of day when the simulation begins (6 = 6 am)."
+        helperText={t('project.startHourHelper')}
       />
       <TextField
         size="small"
         type="number"
-        label="North offset (°)"
+        label={t('project.northOffset')}
         value={project.northAngle ?? 0}
         onChange={(e) => setNorthAngle(Number(e.target.value) % 360)}
-        helperText="Degrees clockwise from canvas-up to true north. 0 = canvas up is north."
+        helperText={t('project.northOffsetHelper')}
       />
 
       <Divider />
       <Button startIcon={<FileDownloadIcon />} onClick={() => exportProjectFile(project)}>
-        Export JSON
+        {t('project.export')}
       </Button>
       <Button startIcon={<FileUploadIcon />} onClick={() => fileRef.current?.click()}>
-        Import JSON
+        {t('project.import')}
       </Button>
       <input
         ref={fileRef}
@@ -82,7 +84,7 @@ export function ProjectSettingsPanel() {
             try {
               setProject(await importProjectFile(file))
             } catch {
-              alert('Could not read that file as a HeatFlow project.')
+              alert(t('project.importError'))
             }
           }
           e.target.value = ''
@@ -92,10 +94,10 @@ export function ProjectSettingsPanel() {
         color="warning"
         startIcon={<RestartAltIcon />}
         onClick={() => {
-          if (confirm('Replace the current plan with the sample apartment?')) resetSample()
+          if (confirm(t('project.resetConfirm'))) resetSample()
         }}
       >
-        Reset to sample
+        {t('project.reset')}
       </Button>
     </Stack>
   )

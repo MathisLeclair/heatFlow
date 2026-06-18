@@ -1,10 +1,12 @@
 import { List, ListItemButton, ListItemText, Button, Stack, Typography, Box } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
+import { useTranslation } from 'react-i18next'
 import { useProjectStore } from '../state/projectStore'
 import { useUiStore } from '../state/uiStore'
 import { zoneTempAt } from '../sim/simulate'
 
 export function ZoneListPanel() {
+  const { t } = useTranslation()
   const zones = useProjectStore((s) => s.project.outsideZones)
   const addCustomZone = useProjectStore((s) => s.addCustomZone)
   const selection = useUiStore((s) => s.selection)
@@ -12,13 +14,13 @@ export function ZoneListPanel() {
 
   return (
     <Stack spacing={1}>
-      <Typography variant="subtitle2">Outside zones</Typography>
+      <Typography variant="subtitle2">{t('zoneList.title')}</Typography>
       <List dense disablePadding>
         {zones.map((z) => {
           const isSel = selection?.type === 'zone' && selection.id === z.id
           const label = z.diurnal
-            ? `${z.diurnal.minC}–${z.diurnal.maxC}°C (peak ${z.diurnal.peakHour}h)`
-            : `${z.tempC}°C constant`
+            ? t('zoneList.diurnal', { min: z.diurnal.minC, max: z.diurnal.maxC, peak: z.diurnal.peakHour })
+            : t('zoneList.constant', { temp: z.tempC })
           return (
             <ListItemButton
               key={z.id}
@@ -53,12 +55,12 @@ export function ZoneListPanel() {
           select({ type: 'zone', id })
         }}
       >
-        Add outside zone
+        {t('zoneList.addZone')}
       </Button>
       <Typography variant="caption" color="text.secondary">
-        Assign each exterior wall to a zone in the wall’s properties (e.g. a shaded
-        courtyard that stays cooler than the street). Current peak example:{' '}
-        {zones[0] ? `${zoneTempAt(zones[0], 16).toFixed(0)}°C` : '—'}.
+        {t('zoneList.hint', {
+          temp: zones[0] ? zoneTempAt(zones[0], 16).toFixed(0) : '—',
+        })}
       </Typography>
     </Stack>
   )

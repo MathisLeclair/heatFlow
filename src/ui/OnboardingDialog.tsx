@@ -12,6 +12,7 @@ import {
 } from '@mui/material'
 import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft'
 import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight'
+import { useTranslation } from 'react-i18next'
 
 // ─── Step illustrations (inline SVG) ─────────────────────────────────────────
 
@@ -143,71 +144,6 @@ interface Step {
   illustration: React.ReactNode
 }
 
-const STEPS: Step[] = [
-  {
-    title: 'Welcome to HeatFlow',
-    description:
-      'HeatFlow simulates how heat moves through your building over time. Draw a floor plan, configure walls and openings, then run the simulation to see how indoor temperatures evolve — and find the best ventilation strategy.',
-    tip: 'This takes about 2 minutes to walk through.',
-    illustration: (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 120 }}>
-        <Box
-          sx={{
-            width: 52,
-            height: 52,
-            transform: 'rotate(45deg)',
-            background: 'linear-gradient(135deg, #ff9a67, #ff7a3d)',
-            borderRadius: '10px',
-            boxShadow: '0 8px 32px #ff7a3d66',
-          }}
-        />
-      </Box>
-    ),
-  },
-  {
-    title: 'Draw your floor plan',
-    description:
-      'Select the Draw Room tool (pentagon icon) in the left toolbar. Click on the canvas to place vertices, then double-click — or click back on the first point — to close the room.',
-    tip: 'Rooms automatically share walls where they touch. Interior walls are derived for you.',
-    illustration: <IllustrationFloorPlan />,
-  },
-  {
-    title: 'Add windows & doors',
-    description:
-      'Select the Window or Door tool, then click on any exterior wall to place an opening. Openings drive natural ventilation: the simulation models the stack effect (buoyancy) and a background breeze.',
-    tip: 'Cross-ventilation (openings on opposite sides) gets a 1.6× flow boost.',
-    illustration: <IllustrationOpenings />,
-  },
-  {
-    title: 'Edit thermal properties',
-    description:
-      'Click any room, wall, or opening to select it — its properties appear in the right panel. Set construction type, glazing, ceiling height, and thermal mass. Click an outside zone to configure temperature or shelter factor.',
-    tip: 'Thermal mass (3–15×) slows how quickly a room heats or cools.',
-    illustration: <IllustrationProperties />,
-  },
-  {
-    title: 'Set the outdoor environment',
-    description:
-      'The "Outside environment" panel lets you set outdoor temperature with an optional day/night swing. Add custom zones (e.g. a walled courtyard) and use the shelter slider to reduce wind reaching openings that face them.',
-    tip: 'A fully enclosed courtyard still benefits from the stack effect — only the breeze component is reduced.',
-    illustration: <IllustrationOutside />,
-  },
-  {
-    title: 'Sun & solar orientation',
-    description:
-      'Drag the compass needle in the bottom-left corner of the canvas to point it toward true north. The simulation then calculates which walls and windows face the sun at each hour, and applies solar heat gain accordingly.',
-    tip: 'Set the simulation start hour to 6 (6 am) for a full day run. Low-E glazing has a much lower solar heat gain coefficient than single glazing.',
-    illustration: <IllustrationSolar />,
-  },
-  {
-    title: 'Run the simulation',
-    description:
-      'Switch to Simulate mode and press Run. Rooms are colour-coded by temperature. Drag the timeline to scrub through the day, or press play to animate. The cooling score (degree-hours above comfort) lets you compare scenarios.',
-    tip: 'Save different window configurations as Scenarios to compare them side by side.',
-    illustration: <IllustrationSimulate />,
-  },
-]
-
 // ─── localStorage key ─────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'heatflow-onboarding-done'
@@ -229,8 +165,68 @@ export function OnboardingDialog({
   open: boolean
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const theme = useTheme()
   const [step, setStep] = useState(0)
+
+  const STEPS: Step[] = [
+    {
+      title: t('onboarding.step0.title'),
+      description: t('onboarding.step0.description'),
+      tip: t('onboarding.step0.tip'),
+      illustration: (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 120 }}>
+          <Box
+            sx={{
+              width: 52,
+              height: 52,
+              transform: 'rotate(45deg)',
+              background: 'linear-gradient(135deg, #ff9a67, #ff7a3d)',
+              borderRadius: '10px',
+              boxShadow: '0 8px 32px #ff7a3d66',
+            }}
+          />
+        </Box>
+      ),
+    },
+    {
+      title: t('onboarding.step1.title'),
+      description: t('onboarding.step1.description'),
+      tip: t('onboarding.step1.tip'),
+      illustration: <IllustrationFloorPlan />,
+    },
+    {
+      title: t('onboarding.step2.title'),
+      description: t('onboarding.step2.description'),
+      tip: t('onboarding.step2.tip'),
+      illustration: <IllustrationOpenings />,
+    },
+    {
+      title: t('onboarding.step3.title'),
+      description: t('onboarding.step3.description'),
+      tip: t('onboarding.step3.tip'),
+      illustration: <IllustrationProperties />,
+    },
+    {
+      title: t('onboarding.step4.title'),
+      description: t('onboarding.step4.description'),
+      tip: t('onboarding.step4.tip'),
+      illustration: <IllustrationOutside />,
+    },
+    {
+      title: t('onboarding.step5.title'),
+      description: t('onboarding.step5.description'),
+      tip: t('onboarding.step5.tip'),
+      illustration: <IllustrationSolar />,
+    },
+    {
+      title: t('onboarding.step6.title'),
+      description: t('onboarding.step6.description'),
+      tip: t('onboarding.step6.tip'),
+      illustration: <IllustrationSimulate />,
+    },
+  ]
+
   const maxSteps = STEPS.length
   const current = STEPS[step]
   const isLast = step === maxSteps - 1
@@ -296,7 +292,7 @@ export function OnboardingDialog({
               }}
             >
               <Typography variant="caption" color="primary" sx={{ fontWeight: 600 }}>
-                Tip:{' '}
+                {t('onboarding.tip')}{' '}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {current.tip}
@@ -315,12 +311,12 @@ export function OnboardingDialog({
           sx={{ width: '100%', bgcolor: 'transparent', px: 2, py: 1.5 }}
           nextButton={
             <Button size="small" onClick={handleNext} endIcon={isLast ? undefined : <KeyboardArrowRight />}>
-              {isLast ? 'Get started' : 'Next'}
+              {isLast ? t('onboarding.getStarted') : t('onboarding.next')}
             </Button>
           }
           backButton={
             <Button size="small" onClick={handleBack} startIcon={<KeyboardArrowLeft />} disabled={step === 0}>
-              Back
+              {t('onboarding.back')}
             </Button>
           }
         />
@@ -330,7 +326,7 @@ export function OnboardingDialog({
             onClick={handleClose}
             sx={{ mb: 1, color: 'text.disabled', fontSize: 11 }}
           >
-            Skip tutorial
+            {t('onboarding.skip')}
           </Button>
         )}
       </DialogActions>

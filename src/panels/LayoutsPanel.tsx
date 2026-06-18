@@ -18,6 +18,7 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import FileUploadIcon from '@mui/icons-material/FileUpload'
 import { nanoid } from 'nanoid'
+import { useTranslation } from 'react-i18next'
 import { useProjectStore } from '../state/projectStore'
 import {
   loadLayouts,
@@ -35,6 +36,7 @@ function formatDate(ts: number): string {
 }
 
 export function LayoutsPanel() {
+  const { t } = useTranslation()
   const project = useProjectStore((s) => s.project)
   const setProject = useProjectStore((s) => s.setProject)
 
@@ -86,21 +88,20 @@ export function LayoutsPanel() {
         <TextField
           size="small"
           fullWidth
-          placeholder={project.name || 'Layout name…'}
+          placeholder={project.name || t('layouts.placeholder')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') save() }}
         />
         <Button variant="outlined" startIcon={<SaveIcon />} onClick={save}>
-          Save
+          {t('layouts.save')}
         </Button>
       </Stack>
 
       {/* Saved layouts list */}
       {layouts.length === 0 ? (
         <Typography variant="caption" color="text.secondary">
-          Save the current floor plan to recall different room configurations
-          independently of the opening scenarios.
+          {t('layouts.hint')}
         </Typography>
       ) : (
         <List dense disablePadding>
@@ -117,7 +118,10 @@ export function LayoutsPanel() {
               <ListItemButton onClick={() => load(entry)} sx={{ borderRadius: 1 }}>
                 <ListItemText
                   primary={entry.name}
-                  secondary={`${entry.roomCount} room${entry.roomCount !== 1 ? 's' : ''} · ${formatDate(entry.savedAt)}`}
+                  secondary={t('layouts.roomCountDate', {
+                    rooms: t('layouts.roomCount', { count: entry.roomCount }),
+                    date: formatDate(entry.savedAt),
+                  })}
                   slotProps={{
                     primary: { variant: 'body2' },
                     secondary: { variant: 'caption' },
@@ -132,7 +136,7 @@ export function LayoutsPanel() {
       {/* File export / import */}
       <Divider />
       <Box sx={{ display: 'flex', gap: 1 }}>
-        <Tooltip title="Export full project as JSON file">
+        <Tooltip title={t('layouts.exportTooltip')}>
           <Button
             size="small"
             variant="outlined"
@@ -140,10 +144,10 @@ export function LayoutsPanel() {
             onClick={() => exportProjectFile(project)}
             sx={{ flex: 1 }}
           >
-            Export
+            {t('layouts.export')}
           </Button>
         </Tooltip>
-        <Tooltip title="Import project from JSON file">
+        <Tooltip title={t('layouts.importTooltip')}>
           <Button
             size="small"
             variant="outlined"
@@ -151,7 +155,7 @@ export function LayoutsPanel() {
             onClick={() => fileRef.current?.click()}
             sx={{ flex: 1 }}
           >
-            Import
+            {t('layouts.import')}
           </Button>
         </Tooltip>
         <input

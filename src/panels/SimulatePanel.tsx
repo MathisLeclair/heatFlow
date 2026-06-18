@@ -13,11 +13,13 @@ import {
 } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import LightbulbIcon from '@mui/icons-material/Lightbulb'
+import { useTranslation } from 'react-i18next'
 import { useProjectStore } from '../state/projectStore'
 import { useSimStore } from '../state/simStore'
 import { coolingHints } from '../sim/hints'
 
 export function SimulatePanel() {
+  const { t } = useTranslation()
   const project = useProjectStore((s) => s.project)
 
   const { result, running, error } = useSimStore()
@@ -46,7 +48,7 @@ export function SimulatePanel() {
           running ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />
         }
       >
-        {running ? 'Simulating…' : result ? 'Re-run simulation' : 'Run simulation'}
+        {running ? t('simulate.running') : result ? t('simulate.rerun') : t('simulate.run')}
       </Button>
 
       {error && <Alert severity="error">{error}</Alert>}
@@ -78,18 +80,18 @@ export function SimulatePanel() {
               variant="caption"
               sx={{ opacity: 0.9, fontWeight: 700, letterSpacing: '0.1em' }}
             >
-              COOLING SCORE
+              {t('simulate.coolingScore')}
             </Typography>
             <Stack direction="row" alignItems="baseline" spacing={0.5}>
               <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
                 {score.toFixed(0)}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                °C·h over comfort
+                {t('simulate.degreeHours')}
               </Typography>
             </Stack>
             <Typography variant="caption" sx={{ opacity: 0.8 }}>
-              Lower is better — avg. degree-hours above {project.comfortTempC}°C.
+              {t('simulate.coolingScoreHelper', { temp: project.comfortTempC })}
             </Typography>
           </Box>
 
@@ -97,7 +99,7 @@ export function SimulatePanel() {
           {hints.length > 0 && (
             <Box>
               <Typography variant="subtitle2" gutterBottom>
-                Suggestions
+                {t('simulate.suggestions')}
               </Typography>
               <List dense disablePadding>
                 {hints.map((h, i) => (

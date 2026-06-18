@@ -11,10 +11,12 @@ import NearMeIcon from '@mui/icons-material/NearMe'
 import PentagonIcon from '@mui/icons-material/Pentagon'
 import WindowIcon from '@mui/icons-material/Window'
 import DoorFrontIcon from '@mui/icons-material/DoorFront'
+import { useTranslation } from 'react-i18next'
 import { useUiStore, type Tool } from '../state/uiStore'
 import { WINDOW_PRESETS, DOOR_PRESETS } from '../presets'
 
 export function EditToolbar() {
+  const { t } = useTranslation()
   const tool = useUiStore((s) => s.tool)
   const setTool = useUiStore((s) => s.setTool)
   const pendingWindowPreset = useUiStore((s) => s.pendingWindowPreset)
@@ -31,11 +33,11 @@ export function EditToolbar() {
         size="small"
         fullWidth
       >
-        <ToggleButton value="select" aria-label="Select">
-          <NearMeIcon fontSize="small" sx={{ mr: 0.5 }} /> Select
+        <ToggleButton value="select" aria-label={t('tool.select')}>
+          <NearMeIcon fontSize="small" sx={{ mr: 0.5 }} /> {t('tool.select')}
         </ToggleButton>
-        <ToggleButton value="draw-room" aria-label="Draw room">
-          <PentagonIcon fontSize="small" sx={{ mr: 0.5 }} /> Room
+        <ToggleButton value="draw-room" aria-label={t('tool.drawRoom')}>
+          <PentagonIcon fontSize="small" sx={{ mr: 0.5 }} /> {t('tool.drawRoom')}
         </ToggleButton>
       </ToggleButtonGroup>
 
@@ -46,11 +48,11 @@ export function EditToolbar() {
         size="small"
         fullWidth
       >
-        <ToggleButton value="add-window" aria-label="Add window">
-          <WindowIcon fontSize="small" sx={{ mr: 0.5 }} /> Window
+        <ToggleButton value="add-window" aria-label={t('tool.addWindow')}>
+          <WindowIcon fontSize="small" sx={{ mr: 0.5 }} /> {t('tool.addWindow')}
         </ToggleButton>
-        <ToggleButton value="add-door" aria-label="Add door">
-          <DoorFrontIcon fontSize="small" sx={{ mr: 0.5 }} /> Door
+        <ToggleButton value="add-door" aria-label={t('tool.addDoor')}>
+          <DoorFrontIcon fontSize="small" sx={{ mr: 0.5 }} /> {t('tool.addDoor')}
         </ToggleButton>
       </ToggleButtonGroup>
 
@@ -58,7 +60,7 @@ export function EditToolbar() {
         <TextField
           select
           size="small"
-          label="Window type"
+          label={t('tool.windowType')}
           value={pendingWindowPreset}
           onChange={(e) => setPendingWindowPreset(e.target.value)}
         >
@@ -73,7 +75,7 @@ export function EditToolbar() {
         <TextField
           select
           size="small"
-          label="Door type"
+          label={t('tool.doorType')}
           value={pendingDoorPreset}
           onChange={(e) => setPendingDoorPreset(e.target.value)}
         >
@@ -87,22 +89,18 @@ export function EditToolbar() {
 
       <Box>
         <Typography variant="caption" color="text.secondary">
-          {hintFor(tool)}
+          {hintForTool(tool, t)}
         </Typography>
       </Box>
     </Stack>
   )
 }
 
-function hintFor(tool: Tool): string {
+function hintForTool(tool: Tool, t: (key: string) => string): string {
   switch (tool) {
-    case 'draw-room':
-      return 'Click to add corners; click the first point to close the room. Points snap to a 0.25 m grid and to existing corners.'
-    case 'add-window':
-      return 'Click on a wall to place a window.'
-    case 'add-door':
-      return 'Click on a wall (interior walls connect rooms) to place a door.'
-    default:
-      return "Click a room, wall, or opening to edit it. Drag a selected room's corner handles to reshape it."
+    case 'draw-room': return t('tool.hintDrawRoom')
+    case 'add-window': return t('tool.hintAddWindow')
+    case 'add-door': return t('tool.hintAddDoor')
+    default: return t('tool.hintSelect')
   }
 }
