@@ -28,6 +28,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import PauseIcon from '@mui/icons-material/Pause'
 import ReplayIcon from '@mui/icons-material/Replay'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import LightModeIcon from '@mui/icons-material/LightMode'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import NearMeIcon from '@mui/icons-material/NearMe'
@@ -47,6 +48,7 @@ import { LayoutsPanel } from '../panels/LayoutsPanel'
 import { TempChart } from '../viz/TempChart'
 import { Legend } from '../viz/Legend'
 import { DisclaimerDialog } from './DisclaimerDialog'
+import { OnboardingDialog, hasSeenOnboarding } from './OnboardingDialog'
 import { WINDOW_PRESETS, DOOR_PRESETS } from '../presets'
 import { zoneTempAt } from '../sim/simulate'
 import type { Project, Wall } from '../model/types'
@@ -61,6 +63,7 @@ export function AppLayout() {
   const resetSample = useProjectStore((s) => s.resetSample)
   const resetBlank = useProjectStore((s) => s.resetBlank)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding())
 
   const { ref: canvasRef, width: canvasW, height: canvasH } = useElementSize<HTMLDivElement>()
   const result = useSimStore((s) => s.result)
@@ -193,6 +196,11 @@ export function AppLayout() {
             </IconButton>
           </Tooltip>
 
+          <Tooltip title="Tutorial">
+            <IconButton size="small" onClick={() => setOnboardingOpen(true)} color="inherit">
+              <HelpOutlineIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="About the model">
             <IconButton size="small" onClick={() => setInfoOpen(true)} color="inherit">
               <InfoOutlinedIcon fontSize="small" />
@@ -234,6 +242,7 @@ export function AppLayout() {
       </Box>
 
       <DisclaimerDialog open={infoOpen} onClose={() => setInfoOpen(false)} />
+      <OnboardingDialog open={onboardingOpen} onClose={() => setOnboardingOpen(false)} />
     </Box>
   )
 }

@@ -42,8 +42,8 @@ export function DisclaimerDialog({
         </Typography>
         <Alert severity="info">
           These are engineering estimates to build intuition, not a certified
-          building-energy or CFD calculation. Wind direction, solar gain through glass,
-          and humidity are not yet modelled.
+          building-energy or CFD calculation. Wind direction, detailed shading, and
+          humidity are not modelled.
         </Alert>
       </DialogContent>
       <DialogActions>
