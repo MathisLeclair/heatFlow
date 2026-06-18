@@ -44,7 +44,8 @@ jobs:
           lftp -u "$OVH_SSH_USER","$OVH_SSH_PASSWORD" "sftp://$OVH_SSH_HOST" -e "
             set sftp:auto-confirm yes;
             set net:max-retries 3;
-            mkdir $OVH_REMOTE_DIR/heatflow;
-            mirror --reverse --delete --verbose dist/ $OVH_REMOTE_DIR/heatflow;
+            cd $OVH_REMOTE_DIR;
+            mkdir -f heatflow;
+            mirror --reverse --delete --verbose dist/ heatflow;
             quit
           "
