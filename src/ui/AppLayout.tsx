@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   AppBar,
   Toolbar,
@@ -225,6 +225,7 @@ export function AppLayout() {
             {mode === 'edit' && <ToolPaletteOverlay />}
             {mode === 'simulate' && result && <SimHUD />}
             {mode === 'simulate' && <Legend />}
+            <NorthArrowOverlay />
           </Box>
           {mode === 'simulate' && <TimelineBar />}
         </Box>
@@ -502,6 +503,8 @@ function OutsideEnvSection() {
     s.project.outsideZones.find((z) => z.kind === 'global'),
   )
   const updateZone = useProjectStore((s) => s.updateZone)
+  const project = useProjectStore((s) => s.project)
+  const setStartHour = useProjectStore((s) => s.setStartHour)
 
   if (!globalZone)
     return (
@@ -577,6 +580,24 @@ function OutsideEnvSection() {
           onChange={(e) => updateZone(globalZone.id, { tempC: Number(e.target.value) })}
         />
       )}
+      <Divider />
+      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+        Sun / orientation
+      </Typography>
+      <Stack direction="row" spacing={1} alignItems="flex-start">
+        <TextField
+          size="small"
+          type="number"
+          label="Start hour"
+          value={project.startHour ?? 6}
+          onChange={(e) => setStartHour(Math.max(0, Math.min(23, Number(e.target.value))))}
+          helperText="Hour of day sim begins"
+          sx={{ flex: 1 }}
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ flex: 1, pt: 1 }}>
+          Drag the compass on the canvas to set north direction.
+        </Typography>
+      </Stack>
     </Stack>
   )
 }
@@ -630,6 +651,130 @@ function OpeningsListSection() {
         })}
       </List>
     </Stack>
+  )
+}
+
+function NorthArrowOverlay() {
+  const northAngle = useProjectStore((s) => s.project.northAngle ?? 0)
+  const setNorthAngle = useProjectStore((s) => s.setNorthAngle)
+  const theme = useTheme()
+  const [dragging, setDragging] = useState(false)
+  const centerRef = useRef<{ x: number; y: number } | null>(null)
+  const widgetRef = useRef<HTMLDivElement>(null)
+
+  const startDrag = (e: React.MouseEvent) => {
+    const rect = widgetRef.current!.getBoundingClientRect()
+    centerRef.current = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    setDragging(true)
+    e.preventDefault()
+  }
+
+  useEffect(() => {
+    if (!dragging) return
+    const onMove = (e: MouseEvent) => {
+      if (!centerRef.current) return
+      const dx = e.clientX - centerRef.current.x
+      const dy = e.clientY - centerRef.current.y
+      // atan2(dx, -dy): angle CW from up (canvas-up = north at 0°)
+      const angle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360
+      setNorthAngle(Math.round(angle))
+    }
+    const onUp = () => setDragging(false)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [dragging, setNorthAngle])
+
+  const isDark = theme.palette.mode === 'dark'
+  const bg = isDark ? 'rgba(18,24,38,0.88)' : 'rgba(255,255,255,0.92)'
+
+  return (
+    <Box
+      ref={widgetRef}
+      onMouseDown={startDrag}
+      sx={{
+        position: 'absolute',
+        bottom: 16,
+        left: 16,
+        zIndex: 10,
+        cursor: dragging ? 'grabbing' : 'grab',
+        userSelect: 'none',
+      }}
+    >
+      <Paper
+        elevation={4}
+        sx={{
+          width: 52,
+          height: 52,
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(8px)',
+          bgcolor: bg,
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)'}`,
+        }}
+      >
+        {/* Rotating needle */}
+        <Box
+          sx={{
+            transform: `rotate(${northAngle}deg)`,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '2px',
+          }}
+        >
+          {/* North tip (red) */}
+          <Box
+            sx={{
+              width: 0,
+              height: 0,
+              borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderBottom: '14px solid #ef4444',
+            }}
+          />
+          <Typography
+            sx={{
+              fontSize: 9,
+              fontWeight: 700,
+              lineHeight: 1,
+              color: '#ef4444',
+              letterSpacing: 0,
+            }}
+          >
+            N
+          </Typography>
+          {/* South tip (muted) */}
+          <Box
+            sx={{
+              width: 0,
+              height: 0,
+              borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderTop: `14px solid ${isDark ? '#4b5563' : '#9ca3af'}`,
+            }}
+          />
+        </Box>
+      </Paper>
+      <Typography
+        variant="caption"
+        sx={{
+          display: 'block',
+          textAlign: 'center',
+          mt: 0.5,
+          color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)',
+          fontSize: 10,
+          pointerEvents: 'none',
+        }}
+      >
+        {Math.round(northAngle)}°
+      </Typography>
+    </Box>
   )
 }
 

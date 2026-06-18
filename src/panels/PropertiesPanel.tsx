@@ -392,6 +392,27 @@ function ZoneEditor({ zone }: { zone: OutsideZone }) {
           />
         </>
       )}
+      <Box>
+        <Typography variant="caption" color="text.secondary">
+          Enclosure / shelter:{' '}
+          {zone.shelterFactor == null || zone.shelterFactor === 0
+            ? 'Open air'
+            : zone.shelterFactor >= 1
+              ? 'Fully walled'
+              : `${Math.round((zone.shelterFactor ?? 0) * 100)}% sheltered`}
+        </Typography>
+        <Slider
+          size="small"
+          min={0}
+          max={1}
+          step={0.05}
+          value={zone.shelterFactor ?? 0}
+          onChange={(_, v) => updateZone(zone.id, { shelterFactor: v as number })}
+        />
+        <Typography variant="caption" color="text.secondary">
+          Reduces ambient wind reaching openings that face this zone (e.g. walled courtyard).
+        </Typography>
+      </Box>
       {zone.kind !== 'global' && (
         <>
           <Divider />

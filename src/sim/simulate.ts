@@ -1,6 +1,6 @@
 import type { OutsideZone, Project } from '../model/types'
-import { dist, polygonArea } from '../model/geometry'
-import { wallResistance, openingPresetById, SURFACE_FILM_R } from '../presets'
+import { dist, polygonArea, polygonCentroid } from '../model/geometry'
+import { wallResistance, openingPresetById, wallTypeById, SURFACE_FILM_R } from '../presets'
 
 // Physical constants (SI).
 const AIR_DENSITY = 1.2 // kg/m³
@@ -10,6 +10,12 @@ const G = 9.81 // m/s²
 const BASE_BREEZE = 0.12
 /** Extra flow factor when a room can cross-ventilate (≥2 open openings to outside). */
 const CROSS_VENT_BOOST = 1.6
+/** Peak direct normal solar irradiance on a clear summer day (W/m²). */
+const I_DIRECT = 800
+/** Peak sun elevation above horizon for mid-latitude summer (degrees). */
+const PEAK_SUN_ELEVATION_DEG = 60
+/** Exterior surface film resistance used for the sol-air model (m²·K/W). */
+const R_EXT_FILM = 0.04
 
 export interface SimResult {
   /** Timestamps in hours from start. */
@@ -61,6 +67,8 @@ interface VentEdge {
   height: number
   dischargeCoeff: number
   crossVentBoost: number
+  /** Fraction of ambient wind reaching this opening (1=open air, 0=fully enclosed yard). */
+  breezeFactor: number
 }
 
 /** Volumetric exchange flow through an open aperture (m³/s). */
@@ -71,8 +79,58 @@ function ventFlow(edge: VentEdge, ta: number, tb: number): number {
     (edge.dischargeCoeff / 3) *
     edge.area *
     Math.sqrt((G * edge.height * dT) / tAvgK)
-  const breeze = edge.dischargeCoeff * edge.area * BASE_BREEZE
+  const breeze = edge.dischargeCoeff * edge.area * BASE_BREEZE * edge.breezeFactor
   return (stack + breeze) * edge.crossVentBoost
+}
+
+// ─── Solar helpers ────────────────────────────────────────────────────────────
+
+/** Sun azimuth in degrees (clockwise from north) for a given local hour of day. */
+function sunAzimuthDeg(hour: number): number {
+  // Simple linear model: east (90°) at 6am → south (180°) at noon → west (270°) at 6pm.
+  return 90 + (hour - 6) * 15
+}
+
+/** Sun elevation above horizon in degrees. Returns 0 at night. */
+function sunElevationDeg(hour: number): number {
+  const h = ((hour % 24) + 24) % 24
+  const progress = (h - 6) / 12  // 0 at 6am, 1 at 6pm
+  if (progress <= 0 || progress >= 1) return 0
+  return PEAK_SUN_ELEVATION_DEG * Math.sin(Math.PI * progress)
+}
+
+/**
+ * Irradiance on a vertical exterior wall surface (W/m²).
+ * Uses the standard formula for a tilted surface:
+ *   I = I_direct × max(0, cos(elev) × cos(sunAz − wallNormalAz))
+ */
+function wallSolarIrradiance(
+  sunAzDeg: number,
+  sunElevDeg: number,
+  wallNormalAzDeg: number,
+): number {
+  if (sunElevDeg <= 0) return 0
+  const elevRad = (sunElevDeg * Math.PI) / 180
+  const azDiffRad = ((sunAzDeg - wallNormalAzDeg) * Math.PI) / 180
+  return I_DIRECT * Math.max(0, Math.cos(elevRad) * Math.cos(azDiffRad))
+}
+
+interface SolarWall {
+  roomIndex: number
+  /** Azimuth (degrees CW from north) of the outward wall normal. */
+  wallNormalAzDeg: number
+  /** Opaque wall area (m²) facing this direction. */
+  solidArea: number
+  /** Fraction of absorbed solar that flows inward: R_int_film / R_total. */
+  inwardFraction: number
+  solarAbsorptance: number
+}
+
+interface SolarOpening {
+  roomIndex: number
+  wallNormalAzDeg: number
+  area: number
+  shgc: number
 }
 
 /**
@@ -96,6 +154,8 @@ export function simulate(project: Project): SimResult {
   }
 
   const zoneById = new Map(project.outsideZones.map((z) => [z.id, z]))
+  const northAngleRad = ((project.northAngle ?? 0) * Math.PI) / 180
+  const startHour = project.startHour ?? 6
 
   // Count open exterior openings per room for the cross-ventilation boost.
   const openExtCount = new Array<number>(n).fill(0)
@@ -110,6 +170,11 @@ export function simulate(project: Project): SimResult {
   // Build edges.
   const solidEdges: SolidEdge[] = []
   const ventEdges: VentEdge[] = []
+  const solarWalls: SolarWall[] = []
+  const solarOpenings: SolarOpening[] = []
+
+  // Precompute room centroids for outward-normal detection.
+  const roomCentroids = rooms.map((r) => polygonCentroid(r.polygon))
 
   for (const wall of project.walls) {
     const ai = sideRoomIndex(wall.sideA, roomIndex)
@@ -136,6 +201,9 @@ export function simulate(project: Project): SimResult {
           ? refZoneId(wall.sideB)
           : undefined
 
+    const outsideZone = outsideZoneId ? zoneById.get(outsideZoneId) : undefined
+    const breezeFactor = 1 - Math.max(0, Math.min(1, outsideZone?.shelterFactor ?? 0))
+
     solidEdges.push({
       a: ai ?? (bi as number),
       b: ai != null && bi != null ? bi : -1,
@@ -157,6 +225,7 @@ export function simulate(project: Project): SimResult {
           height: Math.max(0.2, o.heightM),
           dischargeCoeff: openingPresetById(o.presetId).dischargeCoeff,
           crossVentBoost: boost,
+          breezeFactor,
         })
       } else {
         const uOpening = openingPresetById(o.presetId).uValue
@@ -166,6 +235,56 @@ export function simulate(project: Project): SimResult {
           zoneId: outsideZoneId,
           g: uOpening * area,
         })
+      }
+    }
+
+    // Build solar data for exterior walls only.
+    if (wall.exterior && outsideZoneId) {
+      const roomIdx = ai ?? (bi as number)
+      const centroid = roomCentroids[roomIdx]
+
+      // Outward normal: perpendicular to wall, pointing away from room centroid.
+      const dx = wall.b.x - wall.a.x
+      const dy = wall.b.y - wall.a.y
+      const mx = (wall.a.x + wall.b.x) / 2
+      const my = (wall.a.y + wall.b.y) / 2
+      // Two candidate normals
+      let nx = -dy, ny = dx
+      if ((mx - centroid.x) * nx + (my - centroid.y) * ny < 0) { nx = dy; ny = -dx }
+      // Normalize
+      const nLen = Math.hypot(nx, ny)
+      if (nLen > 1e-9) { nx /= nLen; ny /= nLen }
+
+      // Convert canvas normal (Y-down) to geographic azimuth (CW from north).
+      // North vector in canvas = (sin(northAngle), -cos(northAngle))
+      // East vector in canvas  = (cos(northAngle),  sin(northAngle))
+      const nNorth = nx * Math.sin(northAngleRad) + ny * (-Math.cos(northAngleRad))
+      const nEast  = nx * Math.cos(northAngleRad) + ny * Math.sin(northAngleRad)
+      const wallNormalAzDeg = (Math.atan2(nEast, nNorth) * 180) / Math.PI
+
+      const wt = wallTypeById(wall.wallTypeId)
+      const rTotal = rFabric + SURFACE_FILM_R
+      // Fraction of absorbed solar that flows inward: R_int_film / R_total
+      const inwardFraction = 0.13 / rTotal
+
+      solarWalls.push({
+        roomIndex: roomIdx,
+        wallNormalAzDeg,
+        solidArea,
+        inwardFraction,
+        solarAbsorptance: wt.solarAbsorptance,
+      })
+
+      for (const o of wallOpenings) {
+        const preset = openingPresetById(o.presetId)
+        if (preset.shgc > 0) {
+          solarOpenings.push({
+            roomIndex: roomIdx,
+            wallNormalAzDeg,
+            area: o.widthM * o.heightM,
+            shgc: preset.shgc,
+          })
+        }
       }
     }
   }
@@ -238,6 +357,21 @@ export function simulate(project: Project): SimResult {
       if (e.b >= 0) {
         net[e.b] -= q
         gSum[e.b] += g
+      }
+    }
+
+    // Solar heat gain (time-of-day driven, based on northAngle and startHour).
+    const localHour = (startHour + hour) % 24
+    const sunAz = sunAzimuthDeg(localHour)
+    const sunElev = sunElevationDeg(localHour)
+    if (sunElev > 0) {
+      for (const sw of solarWalls) {
+        const irr = wallSolarIrradiance(sunAz, sunElev, sw.wallNormalAzDeg)
+        net[sw.roomIndex] += sw.solarAbsorptance * irr * sw.solidArea * sw.inwardFraction
+      }
+      for (const so of solarOpenings) {
+        const irr = wallSolarIrradiance(sunAz, sunElev, so.wallNormalAzDeg)
+        net[so.roomIndex] += so.shgc * irr * so.area
       }
     }
 

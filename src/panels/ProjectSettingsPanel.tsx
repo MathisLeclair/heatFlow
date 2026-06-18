@@ -14,6 +14,8 @@ export function ProjectSettingsPanel() {
   const setName = useProjectStore((s) => s.setName)
   const setComfortTempC = useProjectStore((s) => s.setComfortTempC)
   const setSimHours = useProjectStore((s) => s.setSimHours)
+  const setNorthAngle = useProjectStore((s) => s.setNorthAngle)
+  const setStartHour = useProjectStore((s) => s.setStartHour)
   const setProject = useProjectStore((s) => s.setProject)
   const resetSample = useProjectStore((s) => s.resetSample)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -41,6 +43,25 @@ export function ProjectSettingsPanel() {
         label="Simulation length (hours)"
         value={project.simHours}
         onChange={(e) => setSimHours(Math.max(1, Number(e.target.value)))}
+      />
+
+      <Divider />
+      <Typography variant="subtitle2">Solar / Orientation</Typography>
+      <TextField
+        size="small"
+        type="number"
+        label="Simulation start hour (0–23)"
+        value={project.startHour ?? 6}
+        onChange={(e) => setStartHour(Math.max(0, Math.min(23, Number(e.target.value))))}
+        helperText="Hour of day when the simulation begins (6 = 6 am)."
+      />
+      <TextField
+        size="small"
+        type="number"
+        label="North offset (°)"
+        value={project.northAngle ?? 0}
+        onChange={(e) => setNorthAngle(Number(e.target.value) % 360)}
+        helperText="Degrees clockwise from canvas-up to true north. 0 = canvas up is north."
       />
 
       <Divider />

@@ -20,6 +20,8 @@ export interface WallType {
   rValue: number
   /** Selectable thickness options (m). */
   thicknessOptions: number[]
+  /** Fraction of incident solar radiation absorbed by the exterior surface (0–1). */
+  solarAbsorptance: number
 }
 
 /** Thermal properties of a window or door — independent of physical size. */
@@ -31,6 +33,8 @@ export interface GlazingPreset {
   uValue: number
   /** Discharge coefficient when open (orifice efficiency, ~0.6). */
   dischargeCoeff: number
+  /** Solar heat gain coefficient: fraction of incident solar radiation transmitted into the room (0–1). */
+  shgc: number
 }
 
 /** Physical size of a window or door — independent of glazing type. */
@@ -63,6 +67,7 @@ export const WALL_TYPES: WallType[] = [
     refThicknessM: 0.22,
     rValue: 0.35,
     thicknessOptions: [0.1, 0.22, 0.33, 0.45],
+    solarAbsorptance: 0.75,
   },
   {
     id: 'concrete',
@@ -70,6 +75,7 @@ export const WALL_TYPES: WallType[] = [
     refThicknessM: 0.2,
     rValue: 0.2,
     thicknessOptions: [0.1, 0.2, 0.3],
+    solarAbsorptance: 0.65,
   },
   {
     id: 'cavity-insulated',
@@ -77,6 +83,7 @@ export const WALL_TYPES: WallType[] = [
     refThicknessM: 0.3,
     rValue: 2.5,
     thicknessOptions: [0.25, 0.3, 0.35],
+    solarAbsorptance: 0.70,
   },
   {
     id: 'timber-stud-insulated',
@@ -84,6 +91,7 @@ export const WALL_TYPES: WallType[] = [
     refThicknessM: 0.2,
     rValue: 3.5,
     thicknessOptions: [0.12, 0.2, 0.25],
+    solarAbsorptance: 0.60,
   },
   {
     id: 'interior-partition',
@@ -91,16 +99,17 @@ export const WALL_TYPES: WallType[] = [
     refThicknessM: 0.1,
     rValue: 0.4,
     thicknessOptions: [0.07, 0.1, 0.12],
+    solarAbsorptance: 0.55,
   },
 ]
 
 // ─── Window glazing presets ───────────────────────────────────────────────────
 
 export const WINDOW_PRESETS: GlazingPreset[] = [
-  { id: 'window-single', kind: 'window', name: 'Single glazing',    uValue: 5.0, dischargeCoeff: 0.6 },
-  { id: 'window-double', kind: 'window', name: 'Double glazing',    uValue: 2.8, dischargeCoeff: 0.6 },
-  { id: 'window-lowe',   kind: 'window', name: 'Low-E double',      uValue: 1.4, dischargeCoeff: 0.6 },
-  { id: 'window-triple', kind: 'window', name: 'Triple glazing',    uValue: 0.8, dischargeCoeff: 0.6 },
+  { id: 'window-single', kind: 'window', name: 'Single glazing',    uValue: 5.0, dischargeCoeff: 0.6, shgc: 0.86 },
+  { id: 'window-double', kind: 'window', name: 'Double glazing',    uValue: 2.8, dischargeCoeff: 0.6, shgc: 0.70 },
+  { id: 'window-lowe',   kind: 'window', name: 'Low-E double',      uValue: 1.4, dischargeCoeff: 0.6, shgc: 0.40 },
+  { id: 'window-triple', kind: 'window', name: 'Triple glazing',    uValue: 0.8, dischargeCoeff: 0.6, shgc: 0.35 },
 ]
 
 export const WINDOW_SIZE_PRESETS: SizePreset[] = [
@@ -115,10 +124,10 @@ export const WINDOW_SIZE_PRESETS: SizePreset[] = [
 // ─── Door glazing presets ─────────────────────────────────────────────────────
 
 export const DOOR_PRESETS: GlazingPreset[] = [
-  { id: 'door-interior',  kind: 'door', name: 'Interior (hollow core)',  uValue: 2.5, dischargeCoeff: 0.65 },
-  { id: 'door-exterior',  kind: 'door', name: 'Exterior (solid core)',   uValue: 2.0, dischargeCoeff: 0.65 },
-  { id: 'door-insulated', kind: 'door', name: 'Insulated exterior',      uValue: 1.2, dischargeCoeff: 0.65 },
-  { id: 'door-glazed',    kind: 'door', name: 'Full-glazed panel',       uValue: 2.8, dischargeCoeff: 0.65 },
+  { id: 'door-interior',  kind: 'door', name: 'Interior (hollow core)',  uValue: 2.5, dischargeCoeff: 0.65, shgc: 0.0 },
+  { id: 'door-exterior',  kind: 'door', name: 'Exterior (solid core)',   uValue: 2.0, dischargeCoeff: 0.65, shgc: 0.0 },
+  { id: 'door-insulated', kind: 'door', name: 'Insulated exterior',      uValue: 1.2, dischargeCoeff: 0.65, shgc: 0.0 },
+  { id: 'door-glazed',    kind: 'door', name: 'Full-glazed panel',       uValue: 2.8, dischargeCoeff: 0.65, shgc: 0.65 },
 ]
 
 export const DOOR_SIZE_PRESETS: SizePreset[] = [
@@ -135,9 +144,9 @@ export const DOOR_SIZE_PRESETS: SizePreset[] = [
 
 const LEGACY_COMBINED: OpeningPreset[] = [
   // Old combined "large bay" entry — glazing was double, size was large
-  { id: 'window-large', kind: 'window', name: 'Large double-glazed bay (legacy)', uValue: 2.8, dischargeCoeff: 0.6, widthM: 2.0, heightM: 1.6, sillHeightM: 0.5 },
+  { id: 'window-large', kind: 'window', name: 'Large double-glazed bay (legacy)', uValue: 2.8, dischargeCoeff: 0.6, shgc: 0.70, widthM: 2.0, heightM: 1.6, sillHeightM: 0.5 },
   // Old door-french (French doors) — now split into door-glazed + door-sz-french
-  { id: 'door-french', kind: 'door', name: 'French doors (legacy)', uValue: 2.8, dischargeCoeff: 0.65, widthM: 1.5, heightM: 2.1, sillHeightM: 0 },
+  { id: 'door-french', kind: 'door', name: 'French doors (legacy)', uValue: 2.8, dischargeCoeff: 0.65, shgc: 0.65, widthM: 1.5, heightM: 2.1, sillHeightM: 0 },
 ]
 
 // All glazing presets cast as OpeningPreset for simulation lookup (size fields unused there)

@@ -23,6 +23,11 @@ export interface OutsideZone {
   tempC: number
   /** Optional daily temperature swing; overrides `tempC` when present. */
   diurnal?: DiurnalProfile
+  /**
+   * 0 = fully exposed (open air); 1 = fully enclosed (walled courtyard).
+   * Reduces the ambient wind component reaching openings that face this zone.
+   */
+  shelterFactor?: number
   color: string
 }
 
@@ -118,4 +123,11 @@ export interface Project {
   comfortTempC: number
   /** Simulation duration in hours. */
   simHours: number
+  /**
+   * Degrees clockwise from canvas-up to true north (0 = up is north).
+   * Used to determine which walls face the sun.
+   */
+  northAngle?: number
+  /** Hour of day (0–23) when the simulation starts. Default 6 (6 am). */
+  startHour?: number
 }

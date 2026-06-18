@@ -29,6 +29,8 @@ interface ProjectState {
   setName: (name: string) => void
   setComfortTempC: (t: number) => void
   setSimHours: (h: number) => void
+  setNorthAngle: (deg: number) => void
+  setStartHour: (hour: number) => void
   // --- rooms ---
   addRoom: (polygon: Point[]) => Id
   updateRoom: (id: Id, patch: Partial<Room>) => void
@@ -124,6 +126,16 @@ export const useProjectStore = create<ProjectState>()(
     setSimHours: (h) =>
       set((s) => {
         s.project.simHours = h
+      }),
+
+    setNorthAngle: (deg) =>
+      set((s) => {
+        s.project.northAngle = deg
+      }),
+
+    setStartHour: (hour) =>
+      set((s) => {
+        s.project.startHour = hour
       }),
 
     addRoom: (polygon) => {
