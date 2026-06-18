@@ -17,11 +17,13 @@
     "@mui/icons-material": "^7.3.11",
     "@mui/material": "^7.3.11",
     "comlink": "^4.4.2",
+    "i18next": "^26.3.1",
     "immer": "^11.1.8",
     "konva": "^10.3.0",
     "nanoid": "^5.1.11",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-i18next": "^17.0.8",
     "react-konva": "^19.2.5",
     "recharts": "^3.8.1",
     "zustand": "^5.0.14"
