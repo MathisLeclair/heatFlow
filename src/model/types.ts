@@ -110,6 +110,49 @@ export interface Scenario {
   openStates: Record<Id, boolean>
 }
 
+export type FanKind = 'ceiling' | 'standing' | 'box'
+
+/**
+ * A fan placed in a room. Ceiling/standing fans improve perceived comfort via
+ * air movement (modelled as a comfort-threshold offset at scoring time).
+ * Box fans are directed at a specific opening and force a fixed volumetric flow
+ * through it, overriding natural stack + breeze ventilation for that opening.
+ */
+export interface Fan {
+  id: Id
+  roomId: Id
+  kind: FanKind
+  /** Box fans only: the opening (window or door) the fan is directed at. */
+  openingId?: Id
+  /** Forced flow rate (m³/s) used when openingId is set and the opening is open. */
+  flowRateM3S: number
+  isOn: boolean
+  /** Position in world coordinates (metres). Defaults to room centroid. */
+  x?: number
+  y?: number
+  /**
+   * Blow direction for ceiling/standing fans: degrees clockwise from canvas-up.
+   * 0 = blowing toward top of canvas.
+   */
+  directionDeg?: number
+  /** Box fans only: true = pushes outside air into the room; false = extracts room air out. */
+  blowsInward?: boolean
+}
+
+/** A portable air conditioning unit placed in a room. */
+export interface PortableAC {
+  id: Id
+  roomId: Id
+  /** Cooling power in watts (heat extracted from the room air). */
+  coolingPowerW: number
+  isOn: boolean
+  /** Position in world coordinates (metres). Defaults to room centroid. */
+  x?: number
+  y?: number
+}
+
+export type HousingType = 'ground-floor' | 'middle-floor' | 'top-floor' | 'house'
+
 /** The whole document. */
 export interface Project {
   id: Id
@@ -119,6 +162,8 @@ export interface Project {
   walls: Wall[]
   openings: Opening[]
   scenarios: Scenario[]
+  fans?: Fan[]
+  portableACs?: PortableAC[]
   /** Comfort threshold (°C) used for the cooling score. */
   comfortTempC: number
   /** Simulation duration in hours. */
@@ -130,4 +175,12 @@ export interface Project {
   northAngle?: number
   /** Hour of day (0–23) when the simulation starts. Default 6 (6 am). */
   startHour?: number
+  /**
+   * Where the building sits: determines whether roof solar/conduction and/or
+   * ground-slab coupling terms are added to the heat balance.
+   * Defaults to 'house' (full exposure) when absent.
+   */
+  housingType?: HousingType
+  /** Whether the roof is insulated. Only relevant for top-floor and house. */
+  roofInsulated?: boolean
 }

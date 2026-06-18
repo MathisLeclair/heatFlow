@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { nanoid } from 'nanoid'
-import type { Opening, OutsideZone, Project, Room, Wall } from '../model/types'
+import type { Fan, Opening, OutsideZone, PortableAC, Project, Room, Wall } from '../model/types'
 import { deriveWalls } from '../model/walls'
 import { simulate, zoneTempAt } from './simulate'
 
@@ -97,10 +97,9 @@ describe('simulate', () => {
     p.simHours = 120
     const r = simulate(p)
     const last = r.roomTemps[r.roomTemps.length - 1][0]
-    expect(last).toBeGreaterThan(20)
-    expect(last).toBeLessThanOrEqual(35)
-    // Should get meaningfully closer to outside over 5 days.
     expect(last).toBeGreaterThan(28)
+    // Solar gain on walls can push temperature marginally above outdoor, so allow small margin.
+    expect(last).toBeLessThan(37)
   })
 
   it('an open window cools a hot room faster than a closed one', () => {
@@ -140,5 +139,74 @@ describe('simulate', () => {
     expect(r.roomTemps[0]).toHaveLength(2)
     expect(r.roomDegreeHours).toHaveLength(2)
     expect(r.degreeHoursAboveComfort).toBeGreaterThan(0)
+  })
+
+  it('portable AC lowers room temperature compared to no AC', () => {
+    const zones = [globalZone(35)]
+
+    const noAc = project([squareRoom(0, 'A', 30)], zones)
+    const r1 = simulate(noAc)
+
+    const withAc = project([squareRoom(0, 'A', 30)], zones)
+    const ac: PortableAC = { id: 'ac1', roomId: withAc.rooms[0].id, coolingPowerW: 2000, isOn: true }
+    withAc.portableACs = [ac]
+    const r2 = simulate(withAc)
+
+    expect(tempAtHour(r2, 0, 6)).toBeLessThan(tempAtHour(r1, 0, 6))
+  })
+
+  it('box fan at open window forces flow (flow rate matches forced value)', () => {
+    const zones = [globalZone(22)]
+    const p = project([squareRoom(0, 'A', 32)], zones)
+    addWindow(p, 0, true)
+    const openingId = p.openings[0].id
+    const fan: Fan = {
+      id: 'f1',
+      roomId: p.rooms[0].id,
+      kind: 'box',
+      openingId,
+      flowRateM3S: 0.5, // much higher than natural flow
+      isOn: true,
+    }
+    p.fans = [fan]
+    const r = simulate(p)
+    // Find frame at ~1h and check that this opening has the forced flow.
+    const frameIdx = r.hours.findIndex((h) => h >= 1)
+    const openingIdx = r.openingIds.indexOf(openingId)
+    expect(r.openingFlow[frameIdx][openingIdx]).toBeCloseTo(0.5, 3)
+  })
+
+  it('top-floor housing heats more than middle-floor under identical conditions', () => {
+    const zones = [globalZone(35)]
+    const roomTop = squareRoom(0, 'A', 28)
+    const roomMid = squareRoom(0, 'A', 28)
+
+    const pTop = project([roomTop], zones)
+    pTop.housingType = 'top-floor'
+    pTop.roofInsulated = false
+    const rTop = simulate(pTop)
+
+    const pMid = project([roomMid], zones)
+    pMid.housingType = 'middle-floor'
+    const rMid = simulate(pMid)
+
+    expect(tempAtHour(rTop, 0, 8)).toBeGreaterThan(tempAtHour(rMid, 0, 8))
+  })
+
+  it('ground-floor housing stays cooler than top-floor', () => {
+    const zones = [globalZone(35)]
+    const roomGnd = squareRoom(0, 'A', 28)
+    const roomTop = squareRoom(0, 'A', 28)
+
+    const pGnd = project([roomGnd], zones)
+    pGnd.housingType = 'ground-floor'
+    const rGnd = simulate(pGnd)
+
+    const pTop = project([roomTop], zones)
+    pTop.housingType = 'top-floor'
+    pTop.roofInsulated = false
+    const rTop = simulate(pTop)
+
+    expect(tempAtHour(rGnd, 0, 8)).toBeLessThan(tempAtHour(rTop, 0, 8))
   })
 })

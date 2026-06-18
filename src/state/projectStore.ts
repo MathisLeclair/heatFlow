@@ -2,10 +2,14 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { nanoid } from 'nanoid'
 import type {
+  Fan,
+  FanKind,
+  HousingType,
   Id,
   Opening,
   OutsideZone,
   Point,
+  PortableAC,
   Project,
   Room,
   Wall,
@@ -13,7 +17,9 @@ import type {
 import { deriveWalls } from '../model/walls'
 import { makeSampleProject } from '../model/sample'
 import { loadProject, saveProject } from '../persistence/storage'
+import { lerpPoint, polygonCentroid } from '../model/geometry'
 import {
+  fanPresetByKind,
   openingPresetById,
   sizePresetById,
   DEFAULT_WINDOW_SIZE_ID,
@@ -59,6 +65,17 @@ interface ProjectState {
   saveScenario: (name: string) => Id
   applyScenario: (id: Id) => void
   removeScenario: (id: Id) => void
+  // --- fans ---
+  addFan: (roomId: Id, kind: FanKind, openingId?: Id) => Id
+  updateFan: (id: Id, patch: Partial<Fan>) => void
+  removeFan: (id: Id) => void
+  // --- portable ACs ---
+  addPortableAC: (roomId: Id, coolingPowerW: number) => Id
+  updatePortableAC: (id: Id, patch: Partial<PortableAC>) => void
+  removePortableAC: (id: Id) => void
+  // --- housing ---
+  setHousingType: (type: HousingType) => void
+  setRoofInsulated: (v: boolean) => void
 }
 
 const ROOM_COLORS = [
@@ -188,6 +205,8 @@ export const useProjectStore = create<ProjectState>()(
           s.project.walls,
         )
         pruneOrphanOpenings(s.project)
+        s.project.fans = (s.project.fans ?? []).filter((f) => f.roomId !== id)
+        s.project.portableACs = (s.project.portableACs ?? []).filter((a) => a.roomId !== id)
       }),
 
     updateWall: (id, patch) =>
@@ -374,6 +393,90 @@ export const useProjectStore = create<ProjectState>()(
       set((s) => {
         s.project.scenarios = s.project.scenarios.filter((x) => x.id !== id)
       }),
+
+    addFan: (roomId, kind, openingId) => {
+      const id = nanoid(8)
+      const preset = fanPresetByKind(kind)
+      set((s) => {
+        if (!s.project.fans) s.project.fans = []
+        // Default position: at opening center (box fans) or room centroid (others).
+        let x = 0, y = 0
+        if (openingId) {
+          const opening = s.project.openings.find((o) => o.id === openingId)
+          if (opening) {
+            const wall = s.project.walls.find((w) => w.id === opening.wallId)
+            if (wall) {
+              const c = lerpPoint(wall.a, wall.b, opening.t)
+              x = c.x; y = c.y
+            }
+          }
+        } else {
+          const room = s.project.rooms.find((r) => r.id === roomId)
+          if (room) {
+            const c = polygonCentroid(room.polygon)
+            const count = s.project.fans!.filter((f) => f.roomId === roomId && f.kind !== 'box').length
+            x = c.x + count * 0.5; y = c.y + count * 0.3
+          }
+        }
+        s.project.fans.push({
+          id, roomId, kind, openingId,
+          flowRateM3S: preset.flowRateM3S,
+          isOn: true,
+          x, y,
+          directionDeg: 0,
+          blowsInward: true,
+        })
+      })
+      return id
+    },
+
+    updateFan: (id, patch) =>
+      set((s) => {
+        const f = (s.project.fans ?? []).find((x) => x.id === id)
+        if (f) Object.assign(f, patch)
+      }),
+
+    removeFan: (id) =>
+      set((s) => {
+        s.project.fans = (s.project.fans ?? []).filter((x) => x.id !== id)
+      }),
+
+    addPortableAC: (roomId, coolingPowerW) => {
+      const id = nanoid(8)
+      set((s) => {
+        if (!s.project.portableACs) s.project.portableACs = []
+        const room = s.project.rooms.find((r) => r.id === roomId)
+        let x = 0, y = 0
+        if (room) {
+          const c = polygonCentroid(room.polygon)
+          const count = s.project.portableACs!.filter((a) => a.roomId === roomId).length
+          x = c.x - 0.5 + count * 0.5; y = c.y - 0.4 + count * 0.3
+        }
+        s.project.portableACs.push({ id, roomId, coolingPowerW, isOn: true, x, y })
+      })
+      return id
+    },
+
+    updatePortableAC: (id, patch) =>
+      set((s) => {
+        const ac = (s.project.portableACs ?? []).find((x) => x.id === id)
+        if (ac) Object.assign(ac, patch)
+      }),
+
+    removePortableAC: (id) =>
+      set((s) => {
+        s.project.portableACs = (s.project.portableACs ?? []).filter((x) => x.id !== id)
+      }),
+
+    setHousingType: (type) =>
+      set((s) => {
+        s.project.housingType = type
+      }),
+
+    setRoofInsulated: (v) =>
+      set((s) => {
+        s.project.roofInsulated = v
+      }),
   })),
 )
 
@@ -387,6 +490,11 @@ function ptClose(a: Point, b: Point): boolean {
 function pruneOrphanOpenings(project: Project): void {
   const wallIds = new Set(project.walls.map((w) => w.id))
   project.openings = project.openings.filter((o) => wallIds.has(o.wallId))
+  // Also clear any fan openingId references that no longer exist.
+  const openingIds = new Set(project.openings.map((o) => o.id))
+  for (const f of project.fans ?? []) {
+    if (f.openingId && !openingIds.has(f.openingId)) f.openingId = undefined
+  }
 }
 
 // Autosave (debounced) on every change.

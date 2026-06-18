@@ -1,9 +1,9 @@
 import { useMemoizedSnap } from './snap'
 import { useMemo, useState, useRef, useEffect, type ReactElement } from 'react'
-import { Stage, Layer, Line, Circle, Arrow, Text, Group } from 'react-konva'
+import { Stage, Layer, Line, Circle, Arrow, Text, Group, Rect } from 'react-konva'
 import { useTheme } from '@mui/material/styles'
 import type Konva from 'konva'
-import type { Opening, Point, Wall } from '../model/types'
+import type { Fan, Opening, Point, PortableAC, Wall } from '../model/types'
 import { useProjectStore } from '../state/projectStore'
 import { useUiStore } from '../state/uiStore'
 import { useSimStore } from '../state/simStore'
@@ -27,6 +27,8 @@ export function FloorPlanCanvas({ width, height }: Props) {
   const setRoomPolygon = useProjectStore((s) => s.setRoomPolygon)
   const insertWallVertex = useProjectStore((s) => s.insertWallVertex)
   const addOpening = useProjectStore((s) => s.addOpening)
+  const updateFan = useProjectStore((s) => s.updateFan)
+  const updatePortableAC = useProjectStore((s) => s.updatePortableAC)
 
   const mode = useUiStore((s) => s.mode)
   const tool = useUiStore((s) => s.tool)
@@ -341,6 +343,55 @@ export function FloorPlanCanvas({ width, height }: Props) {
         ))}
       </Layer>
 
+      {/* Equipment: fans and portable ACs */}
+      {mode === 'edit' && (
+        <Layer>
+          {(project.fans ?? []).map((fan) => {
+            const room = project.rooms.find((r) => r.id === fan.roomId)
+            if (!room) return null
+            const opening = fan.openingId ? project.openings.find((o) => o.id === fan.openingId) : undefined
+            const wall = opening ? project.walls.find((w) => w.id === opening.wallId) : undefined
+            const defaultPos = opening && wall
+              ? lerpPoint(wall.a, wall.b, opening.t)
+              : polygonCentroid(room.polygon)
+            const posWorld: Point = fan.x != null ? { x: fan.x, y: fan.y! } : defaultPos
+            return (
+              <FanShape
+                key={fan.id}
+                fan={fan}
+                posWorld={posWorld}
+                wall={wall}
+                opening={opening}
+                toScreen={sp}
+                view={view}
+                selected={selection?.type === 'fan' && selection.id === fan.id}
+                onSelect={() => tool === 'select' && select({ type: 'fan', id: fan.id })}
+                onDragEnd={(p) => updateFan(fan.id, { x: p.x, y: p.y })}
+                dark={dark}
+              />
+            )
+          })}
+          {(project.portableACs ?? []).map((ac) => {
+            const room = project.rooms.find((r) => r.id === ac.roomId)
+            if (!room) return null
+            const defaultPos = polygonCentroid(room.polygon)
+            const posWorld: Point = ac.x != null ? { x: ac.x, y: ac.y! } : defaultPos
+            return (
+              <ACShape
+                key={ac.id}
+                ac={ac}
+                posWorld={posWorld}
+                toScreen={sp}
+                view={view}
+                selected={selection?.type === 'ac' && selection.id === ac.id}
+                onSelect={() => tool === 'select' && select({ type: 'ac', id: ac.id })}
+                onDragEnd={(p) => updatePortableAC(ac.id, { x: p.x, y: p.y })}
+              />
+            )
+          })}
+        </Layer>
+      )}
+
       {/* Animated heat-flow particles (simulate mode) */}
       {simulating && <HeatParticles view={view} />}
 
@@ -516,6 +567,168 @@ function AirflowArrow({
 function openingHalfFraction(opening: Opening, wall: Wall): number {
   const wallLen = Math.hypot(wall.b.x - wall.a.x, wall.b.y - wall.a.y) || 1
   return Math.min(0.45, opening.widthM / 2 / wallLen)
+}
+
+function FanShape({
+  fan,
+  posWorld,
+  wall,
+  opening,
+  toScreen,
+  view,
+  selected,
+  onSelect,
+  onDragEnd,
+  dark,
+}: {
+  fan: Fan
+  posWorld: Point
+  wall?: Wall
+  opening?: Opening
+  toScreen: (p: Point) => Point
+  view: ViewTransform
+  selected: boolean
+  onSelect: () => void
+  onDragEnd: (p: Point) => void
+  dark: boolean
+}) {
+  const pos = toScreen(posWorld)
+  const R = 11
+  const color = fan.isOn ? '#43a047' : '#757575'
+  const ringColor = selected ? '#ff7a3d' : color
+
+  const dirRad = ((fan.directionDeg ?? 0) * Math.PI) / 180
+  // 3 blade lines at 120° intervals, rotated by direction
+  const blades = [0, 120, 240].map((offset) => {
+    const a = dirRad + (offset * Math.PI) / 180
+    return [Math.sin(a) * R * 0.85, -Math.cos(a) * R * 0.85]
+  })
+
+  // For box fans with an opening, compute the wall-normal arrow direction
+  let boxDirDx = 0; let boxDirDy = 0
+  if (fan.kind === 'box' && wall && opening) {
+    const dx = wall.b.x - wall.a.x
+    const dy = wall.b.y - wall.a.y
+    const len = Math.hypot(dx, dy) || 1
+    // perpendicular to wall in canvas coords
+    let nx = -dy / len; let ny = dx / len
+    // determine which side is the room interior (we point away from centroid = outward normal)
+    // we use the room centroid: if we can't determine, default to nx/ny
+    // blowsInward: arrow from outside into room (reverse of outward normal)
+    const sign = fan.blowsInward ? -1 : 1
+    boxDirDx = nx * sign; boxDirDy = ny * sign
+  }
+
+  return (
+    <Group
+      x={pos.x}
+      y={pos.y}
+      draggable
+      onDragEnd={(e) => {
+        const world = view.toWorld({ x: e.target.x(), y: e.target.y() })
+        onDragEnd(world)
+        e.target.x(pos.x)
+        e.target.y(pos.y)
+      }}
+      onClick={(e) => { e.cancelBubble = true; onSelect() }}
+    >
+      {/* Background circle */}
+      <Circle
+        radius={R}
+        fill={dark ? 'rgba(20,30,45,0.88)' : 'rgba(255,255,255,0.88)'}
+        stroke={ringColor}
+        strokeWidth={selected ? 2.5 : 1.5}
+      />
+      {/* Blade lines */}
+      {blades.map(([bx, by], i) => (
+        <Line key={i} points={[0, 0, bx, by]} stroke={color} strokeWidth={1.8} lineCap="round" />
+      ))}
+      {/* Center hub */}
+      <Circle radius={2.5} fill={color} />
+      {/* Direction arrow for ceiling/standing fans */}
+      {fan.kind !== 'box' && (
+        <Arrow
+          points={[0, 0, Math.sin(dirRad) * (R + 7), -Math.cos(dirRad) * (R + 7)]}
+          pointerLength={5}
+          pointerWidth={5}
+          stroke={color}
+          fill={color}
+          strokeWidth={1.5}
+        />
+      )}
+      {/* Direction arrow for box fans */}
+      {fan.kind === 'box' && (boxDirDx !== 0 || boxDirDy !== 0) && (
+        <Arrow
+          points={[
+            -boxDirDx * R * 0.6, -boxDirDy * R * 0.6,
+            boxDirDx * (R + 7), boxDirDy * (R + 7),
+          ]}
+          pointerLength={6}
+          pointerWidth={6}
+          stroke={color}
+          fill={color}
+          strokeWidth={2}
+        />
+      )}
+    </Group>
+  )
+}
+
+function ACShape({
+  ac,
+  posWorld,
+  toScreen,
+  view,
+  selected,
+  onSelect,
+  onDragEnd,
+}: {
+  ac: PortableAC
+  posWorld: Point
+  toScreen: (p: Point) => Point
+  view: ViewTransform
+  selected: boolean
+  onSelect: () => void
+  onDragEnd: (p: Point) => void
+}) {
+  const pos = toScreen(posWorld)
+  const W = 18; const H = 14
+  const color = ac.isOn ? '#1e88e5' : '#757575'
+  const borderColor = selected ? '#ff7a3d' : color
+
+  return (
+    <Group
+      x={pos.x}
+      y={pos.y}
+      draggable
+      onDragEnd={(e) => {
+        const world = view.toWorld({ x: e.target.x(), y: e.target.y() })
+        onDragEnd(world)
+        e.target.x(pos.x)
+        e.target.y(pos.y)
+      }}
+      onClick={(e) => { e.cancelBubble = true; onSelect() }}
+    >
+      <Rect
+        x={-W / 2} y={-H / 2}
+        width={W} height={H}
+        fill={ac.isOn ? 'rgba(30,136,229,0.15)' : 'rgba(100,100,100,0.12)'}
+        stroke={borderColor}
+        strokeWidth={selected ? 2.5 : 1.5}
+        cornerRadius={3}
+      />
+      {/* Three horizontal vent slats */}
+      {[-3, 0, 3].map((yOff) => (
+        <Line
+          key={yOff}
+          points={[-W / 2 + 3, yOff, W / 2 - 3, yOff]}
+          stroke={color}
+          strokeWidth={1.5}
+          lineCap="round"
+        />
+      ))}
+    </Group>
+  )
 }
 
 const SCALE_CANDIDATES = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100]

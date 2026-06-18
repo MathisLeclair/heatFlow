@@ -8,6 +8,8 @@ export type Selection =
   | { type: 'wall'; id: Id }
   | { type: 'opening'; id: Id }
   | { type: 'zone'; id: Id }
+  | { type: 'fan'; id: Id }
+  | { type: 'ac'; id: Id }
   | null
 
 export type Mode = 'edit' | 'simulate'

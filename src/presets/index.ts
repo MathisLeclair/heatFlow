@@ -174,6 +174,44 @@ export function sizePresetById(id: string): SizePreset {
 export const DEFAULT_WINDOW_SIZE_ID = 'win-sz-standard'
 export const DEFAULT_DOOR_SIZE_ID   = 'door-sz-single'
 
+// ─── Fan presets ──────────────────────────────────────────────────────────────
+
+export interface FanPreset {
+  kind: 'ceiling' | 'standing' | 'box'
+  name: string
+  /** Forced volumetric flow (m³/s) for box fans directed at an opening. 0 for room fans. */
+  flowRateM3S: number
+  /**
+   * Comfort-threshold offset (°C) for ceiling/standing fans: the occupant feels
+   * comfortable at this many degrees warmer than without the fan. Not stored on
+   * the Fan entity — looked up at scoring time from the kind.
+   */
+  comfortOffsetC: number
+}
+
+export const FAN_PRESETS: FanPreset[] = [
+  { kind: 'ceiling',  name: 'Ceiling fan',  flowRateM3S: 0,    comfortOffsetC: 2.0 },
+  { kind: 'standing', name: 'Standing fan', flowRateM3S: 0,    comfortOffsetC: 1.5 },
+  { kind: 'box',      name: 'Box fan',      flowRateM3S: 0.09, comfortOffsetC: 0.0 },
+]
+
+export function fanPresetByKind(kind: string): FanPreset {
+  return FAN_PRESETS.find((f) => f.kind === kind) ?? FAN_PRESETS[0]
+}
+
+// ─── Portable AC presets ──────────────────────────────────────────────────────
+
+export interface AcPreset {
+  coolingPowerW: number
+  name: string
+}
+
+export const AC_PRESETS: AcPreset[] = [
+  { coolingPowerW: 1000, name: 'Small (~1 kW / 3 500 BTU)' },
+  { coolingPowerW: 2000, name: 'Medium (~2 kW / 7 000 BTU)' },
+  { coolingPowerW: 3500, name: 'Large (~3.5 kW / 12 000 BTU)' },
+]
+
 /** R-value of a wall scaled from its preset to an arbitrary thickness. */
 export function wallResistance(wallTypeId: string, thicknessM: number): number {
   const t = wallTypeById(wallTypeId)

@@ -1,6 +1,6 @@
 import type { OutsideZone, Project } from '../model/types'
 import { dist, polygonArea, polygonCentroid } from '../model/geometry'
-import { wallResistance, openingPresetById, wallTypeById, SURFACE_FILM_R } from '../presets'
+import { fanPresetByKind, wallResistance, openingPresetById, wallTypeById, SURFACE_FILM_R } from '../presets'
 
 // Physical constants (SI).
 const AIR_DENSITY = 1.2 // kg/m³
@@ -14,6 +14,18 @@ const CROSS_VENT_BOOST = 1.6
 const I_DIRECT = 800
 /** Peak sun elevation above horizon for mid-latitude summer (degrees). */
 const PEAK_SUN_ELEVATION_DEG = 60
+/** Deep-ground temperature (°C) used for ground-floor slab coupling. */
+const GROUND_TEMP_C = 17
+/** Overall heat-transfer coefficient of an uninsulated concrete slab-on-grade (W/m²·K). */
+const U_FLOOR_SLAB = 0.5
+/** Roof U-value (W/m²·K) — uninsulated flat/tile roof. */
+const U_ROOF_UNINSULATED = 1.5
+/** Roof U-value (W/m²·K) — modern insulated roof. */
+const U_ROOF_INSULATED = 0.35
+/** Solar absorptance of a typical roof surface (dark tile / felt). */
+const ALPHA_ROOF = 0.75
+/** Interior surface film resistance (m²·K/W), from SURFACE_FILM_R split. */
+const R_INT_FILM = 0.13
 
 export interface SimResult {
   /** Timestamps in hours from start. */
@@ -67,10 +79,13 @@ interface VentEdge {
   crossVentBoost: number
   /** Fraction of ambient wind reaching this opening (1=open air, 0=fully enclosed yard). */
   breezeFactor: number
+  /** When set, a box fan forces this exact flow rate (m³/s) regardless of stack/breeze. */
+  forcedFlowM3S?: number
 }
 
 /** Volumetric exchange flow through an open aperture (m³/s). */
 function ventFlow(edge: VentEdge, ta: number, tb: number): number {
+  if (edge.forcedFlowM3S != null) return edge.forcedFlowM3S
   const dT = Math.abs(ta - tb)
   const tAvgK = 273.15 + (ta + tb) / 2
   const stack =
@@ -154,6 +169,45 @@ export function simulate(project: Project): SimResult {
   const zoneById = new Map(project.outsideZones.map((z) => [z.id, z]))
   const northAngleRad = ((project.northAngle ?? 0) * Math.PI) / 180
   const startHour = project.startHour ?? 6
+  const globalZone = project.outsideZones.find((z) => z.kind === 'global')
+
+  // ── Fans ──────────────────────────────────────────────────────────────────
+  // Map opening id → forced flow rate for active box fans.
+  const forcedFlowByOpening = new Map<string, number>()
+  for (const fan of project.fans ?? []) {
+    if (fan.isOn && fan.kind === 'box' && fan.openingId) {
+      forcedFlowByOpening.set(fan.openingId, fan.flowRateM3S)
+    }
+  }
+
+  // Per-room comfort offset from active ceiling/standing fans (capped at 3 °C).
+  const fanComfortOffset = new Array<number>(n).fill(0)
+  for (const fan of project.fans ?? []) {
+    if (!fan.isOn || fan.kind === 'box') continue
+    const ri = roomIndex.get(fan.roomId)
+    if (ri == null) continue
+    const preset = fanPresetByKind(fan.kind)
+    fanComfortOffset[ri] = Math.min(3, fanComfortOffset[ri] + preset.comfortOffsetC)
+  }
+
+  // ── Portable ACs ──────────────────────────────────────────────────────────
+  // Per-room constant heat removal (W) from active AC units.
+  const acCoolingW = new Array<number>(n).fill(0)
+  for (const ac of project.portableACs ?? []) {
+    if (!ac.isOn) continue
+    const ri = roomIndex.get(ac.roomId)
+    if (ri != null) acCoolingW[ri] += ac.coolingPowerW
+  }
+
+  // ── Housing type ──────────────────────────────────────────────────────────
+  const housingType = project.housingType ?? 'middle-floor'
+  const hasRoof   = housingType === 'top-floor' || housingType === 'house'
+  const hasGround = housingType === 'ground-floor' || housingType === 'house'
+  const uRoof = project.roofInsulated ? U_ROOF_INSULATED : U_ROOF_UNINSULATED
+  const rRoof = 1 / uRoof
+  const roofInwardFraction = R_INT_FILM / (rRoof + SURFACE_FILM_R)
+  // Floor area per room (m²) — used for roof and ground coupling.
+  const floorArea = rooms.map((r) => polygonArea(r.polygon))
 
   // Count open exterior openings per room for the cross-ventilation boost.
   const openExtCount = new Array<number>(n).fill(0)
@@ -214,6 +268,7 @@ export function simulate(project: Project): SimResult {
       if (o.isOpen) {
         const ventRoom = ai ?? (bi as number)
         const boost = openExtCount[ventRoom] >= 2 ? CROSS_VENT_BOOST : 1
+        const forcedFlow = forcedFlowByOpening.get(o.id)
         ventEdges.push({
           openingId: o.id,
           a: ai ?? (bi as number),
@@ -224,6 +279,7 @@ export function simulate(project: Project): SimResult {
           dischargeCoeff: openingPresetById(o.presetId).dischargeCoeff,
           crossVentBoost: boost,
           breezeFactor,
+          forcedFlowM3S: forcedFlow,
         })
       } else {
         const uOpening = openingPresetById(o.presetId).uValue
@@ -373,6 +429,32 @@ export function simulate(project: Project): SimResult {
       }
     }
 
+    // Portable AC: constant heat removal from room air.
+    for (let i = 0; i < n; i++) {
+      if (acCoolingW[i] > 0) net[i] -= acCoolingW[i]
+    }
+
+    // Housing type: roof and ground-slab coupling.
+    const tOutside = globalZone ? zoneTempAt(globalZone, localHour) : 30
+    if (hasRoof) {
+      const elevRad = (sunElev * Math.PI) / 180
+      const iHoriz = sunElev > 0 ? I_DIRECT * Math.sin(elevRad) : 0
+      for (let i = 0; i < n; i++) {
+        const a = floorArea[i]
+        const qSolar = ALPHA_ROOF * iHoriz * a * roofInwardFraction
+        const qCond  = uRoof * a * (tOutside - T[i])
+        net[i] += qSolar + qCond
+        gSum[i] += uRoof * a
+      }
+    }
+    if (hasGround) {
+      for (let i = 0; i < n; i++) {
+        const a = floorArea[i]
+        net[i] += U_FLOOR_SLAB * a * (GROUND_TEMP_C - T[i])
+        gSum[i] += U_FLOOR_SLAB * a
+      }
+    }
+
     // Stable explicit step: dt ≤ 0.4·min(C/Gsum), bounded by the frame boundary.
     let dt = frameTargetSec - elapsedSec
     for (let i = 0; i < n; i++) {
@@ -423,15 +505,17 @@ export function simulate(project: Project): SimResult {
   }
 
   function finalizeScore(): void {
-    const comfort = project.comfortTempC
     const hours = result.hours
     const temps = result.roomTemps
     for (let i = 0; i < n; i++) {
+      // Fans raise the effective comfort threshold: people tolerate higher temperatures
+      // when air is moving (evaporative cooling effect).
+      const effectiveComfort = project.comfortTempC + fanComfortOffset[i]
       let acc = 0
       for (let f = 1; f < hours.length; f++) {
         const dtH = hours[f] - hours[f - 1]
-        const e0 = Math.max(0, temps[f - 1][i] - comfort)
-        const e1 = Math.max(0, temps[f][i] - comfort)
+        const e0 = Math.max(0, temps[f - 1][i] - effectiveComfort)
+        const e1 = Math.max(0, temps[f][i] - effectiveComfort)
         acc += ((e0 + e1) / 2) * dtH
       }
       result.roomDegreeHours[i] = acc
