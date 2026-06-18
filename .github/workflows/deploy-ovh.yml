@@ -31,8 +31,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install lftp
-        run: sudo apt-get install -y lftp
+      - name: Install lftp and sshpass
+        run: sudo apt-get install -y lftp sshpass
 
       - name: Deploy to OVH via lftp
         env:
@@ -41,10 +41,10 @@ jobs:
           OVH_SSH_HOST: ${{ secrets.OVH_SSH_HOST }}
           OVH_SSH_USER: ${{ secrets.OVH_SSH_USER }}
         run: |
+          echo "-mkdir $OVH_REMOTE_DIR/heatflow" | sshpass -p "$OVH_SSH_PASSWORD" sftp -o StrictHostKeyChecking=no -b - "$OVH_SSH_USER@$OVH_SSH_HOST" || true
           lftp -u "$OVH_SSH_USER","$OVH_SSH_PASSWORD" "sftp://$OVH_SSH_HOST" -e "
             set sftp:auto-confirm yes;
             set net:max-retries 3;
-            mkdir -p $OVH_REMOTE_DIR/heatflow;
             mirror --reverse --delete --verbose dist/ $OVH_REMOTE_DIR/heatflow;
             quit
           "
