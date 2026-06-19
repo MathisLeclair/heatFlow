@@ -9,7 +9,7 @@ import { useUiStore } from '../state/uiStore'
 import { useSimStore } from '../state/simStore'
 import { fitTransform, type ViewTransform } from './viewTransform'
 import { closestPointOnSegment, lerpPoint, polygonCentroid } from '../model/geometry'
-import { HeatParticles } from '../viz/HeatParticles'
+import { tempToRGB } from '../viz/colorScale'
 
 interface Props {
   width: number
@@ -78,6 +78,16 @@ export function FloorPlanCanvas({ width, height }: Props) {
   const [hover, setHover] = useState<Point | null>(null)
 
   const simulating = mode === 'simulate' && !!result
+
+  // Temperature range for the heat colour scale (updated each render).
+  const tempRange = useMemo(() => {
+    if (!result) return { min: 20, max: 35 }
+    let min = Infinity, max = -Infinity
+    for (const row of result.roomTemps) {
+      for (const t of row) { min = Math.min(min, t); max = Math.max(max, t) }
+    }
+    return isFinite(min) ? { min, max } : { min: 20, max: 35 }
+  }, [result])
 
   // Middle-mouse pan tracking
   const panOrigin = useRef<{ mx: number; my: number; ox: number; oy: number } | null>(null)
@@ -234,7 +244,7 @@ export function FloorPlanCanvas({ width, height }: Props) {
         <GridLines view={view} width={width} height={height} dark={dark} />
       </Layer>
 
-      {/* Rooms — outline only, no fill (particles show temp) */}
+      {/* Rooms — filled with temperature colour in simulate mode */}
       <Layer>
         {project.rooms.map((room) => {
           const pts = room.polygon.flatMap((p) => {
@@ -242,13 +252,19 @@ export function FloorPlanCanvas({ width, height }: Props) {
             return [s.x, s.y]
           })
           const isSel = selection?.type === 'room' && selection.id === room.id
+          let fill = 'rgba(0,0,0,0.005)'
+          if (simulating && result) {
+            const ri = result.roomIds.indexOf(room.id)
+            const temp = ri >= 0 ? (result.roomTemps[frame]?.[ri] ?? 22) : 22
+            const [r, g, b] = tempToRGB(temp, tempRange.min, tempRange.max)
+            fill = `rgba(${r},${g},${b},0.45)`
+          }
           return (
             <Line
               key={room.id}
               points={pts}
               closed
-              // Near-invisible fill keeps the interior hit-testable for clicks.
-              fill="rgba(0,0,0,0.005)"
+              fill={fill}
               lineJoin="round"
               stroke={isSel ? '#ff7a3d' : dark ? '#3a5270' : '#8fa8b8'}
               strokeWidth={isSel ? 2.5 : 1.5}
@@ -391,9 +407,6 @@ export function FloorPlanCanvas({ width, height }: Props) {
           })}
         </Layer>
       )}
-
-      {/* Animated heat-flow particles (simulate mode) */}
-      {simulating && <HeatParticles view={view} />}
 
       {/* Airflow direction arrows (simulate mode) */}
       {simulating && result && (

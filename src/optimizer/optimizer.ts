@@ -134,12 +134,19 @@ function generateMasks(project: Project): Array<{ label: string; mask: Mask }> {
 
 // ─── Equipment placement ──────────────────────────────────────────────────────
 
+// How box fans are oriented at their openings:
+//   exhaust   – all blow outward (extract hot air)
+//   intake    – all blow inward (push cooler outside air in)
+//   alternate – even-indexed fans intake, odd-indexed exhaust (forced cross-flow)
+type BoxFanMode = 'exhaust' | 'intake' | 'alternate'
+
 function placeEquipment(
   base: Project,
   mask: Mask,
   inventory: OptimizerInventory,
   roomHeatRank: number[],       // room array indices sorted by °C·h desc
   flowRankedIds: string[],      // opening ids sorted by avg flow desc
+  boxFanMode: BoxFanMode = 'exhaust',
 ): Project {
   const openings = base.openings.map((o): Opening => {
     const state = mask[o.id]
@@ -173,9 +180,12 @@ function placeEquipment(
     })
   }
 
-  // Box fans → openings with highest flow that are open/auto in this mask
+  // Box fans → openings with highest flow that are open/auto in this mask.
+  // Orientation is controlled by boxFanMode so the optimizer can test intake
+  // vs exhaust vs alternating (forced cross-flow) as separate candidates.
   const eligibleIds = flowRankedIds.filter((id) => mask[id] === true || mask[id] === 'auto')
   let boxLeft = inventory.boxFans
+  let boxIdx = 0
   for (const openingId of eligibleIds) {
     if (boxLeft <= 0) break
     const o = openings.find((op) => op.id === openingId)
@@ -187,6 +197,10 @@ function placeEquipment(
         : wall.sideB.type === 'room' ? wall.sideB.id
           : null
     if (!roomId) continue
+    const blowsInward =
+      boxFanMode === 'intake' ? true
+        : boxFanMode === 'exhaust' ? false
+          : boxIdx % 2 === 0  // alternate: first fan intake, next exhaust, …
     fans.push({
       id: nanoid(8),
       roomId,
@@ -194,9 +208,10 @@ function placeEquipment(
       openingId,
       flowRateM3S: 0.09,
       isOn: true,
-      blowsInward: false,
+      blowsInward,
     })
     boxLeft--
+    boxIdx++
   }
 
   return { ...base, openings, fans, portableACs }
@@ -242,10 +257,33 @@ export async function runOptimizer(
   // Step 2: Generate opening-state candidates
   const candidates = generateMasks(project)
 
-  // Step 3: Build project for each candidate
-  const candidateProjects = candidates.map((c) =>
-    placeEquipment(project, c.mask, inventory, roomHeatRank, flowRankedIds)
-  )
+  // Step 3: Expand each candidate by box-fan orientation.
+  // When box fans are available we try exhaust, intake, and alternating
+  // (forced cross-flow) as independent variants — they can meaningfully
+  // differ in score and the best orientation is not known in advance.
+  const orientations: Array<{ mode: BoxFanMode; suffix: string }> =
+    inventory.boxFans === 0
+      ? [{ mode: 'exhaust', suffix: '' }]                // no fans — orientation irrelevant
+      : inventory.boxFans === 1
+        ? [
+            { mode: 'exhaust', suffix: ' · fans out' },
+            { mode: 'intake',  suffix: ' · fans in' },
+          ]
+        : [
+            { mode: 'exhaust',   suffix: ' · fans out' },
+            { mode: 'intake',    suffix: ' · fans in' },
+            { mode: 'alternate', suffix: ' · fans mixed' },
+          ]
+
+  const candidateProjects: Array<{ label: string; project: Project }> = []
+  for (const c of candidates) {
+    for (const { mode, suffix } of orientations) {
+      candidateProjects.push({
+        label: c.label + suffix,
+        project: placeEquipment(project, c.mask, inventory, roomHeatRank, flowRankedIds, mode),
+      })
+    }
+  }
 
   // Step 4: Simulate in batches of 8 with progress updates
   const BATCH = 8
@@ -255,14 +293,14 @@ export async function runOptimizer(
 
   for (let i = 0; i < candidateProjects.length; i += BATCH) {
     const batch = candidateProjects.slice(i, i + BATCH)
-    const batchLabels = candidates.slice(i, i + BATCH).map((c) => c.label)
-    const simResults = await Promise.all(batch.map((p) => worker.run(p)))
+    const batchLabels = candidateProjects.slice(i, i + BATCH).map((c) => c.label)
+    const simResults = await Promise.all(batch.map((p) => worker.run(p.project)))
     simResults.forEach((result, j) => {
       allResults.push({
         label: batchLabels[j],
         score: result.degreeHoursAboveComfort,
         result,
-        project: batch[j],
+        project: batch[j].project,
       })
     })
     done += batch.length

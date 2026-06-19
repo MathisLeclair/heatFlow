@@ -33,6 +33,10 @@ const R_INT_FILM = 0.13
  * single-hose efficiency penalty.
  */
 const AC_EXHAUST_FLOW_PER_W = 5e-5
+/** Directed airflow (m³/s) for a standing fan aimed squarely at an opening. */
+const FAN_FLOW_STANDING = 0.12
+/** Directed airflow (m³/s) for a ceiling fan (more diffuse, smaller directed component). */
+const FAN_FLOW_CEILING = 0.06
 
 export interface SimResult {
   /** Timestamps in hours from start. */
@@ -88,6 +92,8 @@ interface VentEdge {
   breezeFactor: number
   /** When set, a box fan forces this exact flow rate (m³/s) regardless of stack/breeze. */
   forcedFlowM3S?: number
+  /** Additional flow (m³/s) from a directed standing/ceiling fan aimed at this opening. */
+  fanBoostM3S?: number
   /** When true, open/close decision is made each step: open iff outside < room. */
   autoOpen?: boolean
   /** Conductance (W/K) to use when autoOpen edge is in its "closed" state. */
@@ -104,7 +110,7 @@ function ventFlow(edge: VentEdge, ta: number, tb: number): number {
     edge.area *
     Math.sqrt((G * edge.height * dT) / tAvgK)
   const breeze = edge.dischargeCoeff * edge.area * BASE_BREEZE * edge.breezeFactor
-  return (stack + breeze) * edge.crossVentBoost
+  return (stack + breeze) * edge.crossVentBoost + (edge.fanBoostM3S ?? 0)
 }
 
 // ─── Solar helpers ────────────────────────────────────────────────────────────
@@ -168,12 +174,25 @@ export function simulate(project: Project): SimResult {
   const roomIndex = new Map(rooms.map((r, i) => [r.id, i]))
 
   // Capacitance and initial temperature per room.
+  //
+  // A room's thermal mass is not just its air — walls, floor, and ceiling store
+  // heat too. We add a structural baseline per m² of floor area representing
+  // ~5 cm of thermally-coupled concrete/masonry (floor slab + inner wall layer).
+  //   5 cm × 2 300 kg/m³ × 880 J/(kg·K) ≈ 101 000 J/(m²·K)
+  // rounded to 80 000 J/(m²·K) to account for lighter partitions and voids.
+  // This raises a typical 20 m² room from ~60 kJ/K (air only) to ~1.7 MJ/K,
+  // giving a 2 kW AC ~3–4 h to drop 7 °C instead of an unrealistic 10–15 min.
+  // The thermalMassMultiplier then scales the whole effective mass (1 = light
+  // timber frame, 3 = standard concrete, 10 = heavy stone).
+  const STRUCTURAL_MASS_PER_M2 = 80_000 // J/(m²·K)
   const C = new Array<number>(n)
   const T = new Array<number>(n)
   for (let i = 0; i < n; i++) {
     const r = rooms[i]
-    const volume = polygonArea(r.polygon) * r.ceilingHeightM
-    C[i] = AIR_DENSITY * AIR_CP * volume * Math.max(1, r.thermalMassMultiplier)
+    const area = polygonArea(r.polygon)
+    const volume = area * r.ceilingHeightM
+    const structural = STRUCTURAL_MASS_PER_M2 * area
+    C[i] = (AIR_DENSITY * AIR_CP * volume + structural) * Math.max(1, r.thermalMassMultiplier)
     T[i] = r.initialTempC
   }
 
@@ -181,6 +200,44 @@ export function simulate(project: Project): SimResult {
   const northAngleRad = ((project.northAngle ?? 0) * Math.PI) / 180
   const startHour = project.startHour ?? 6
   const globalZone = project.outsideZones.find((z) => z.kind === 'global')
+
+  // ── Directed fan airflow boost ────────────────────────────────────────────
+  // Standing/ceiling fans with a set direction push extra air through any open
+  // opening whose wall normal aligns with the fan's blow direction.
+  // Contribution = baseFlow × cos(angle), applied only within ±75° (alignment > 0.25).
+  // directionDeg is CW from canvas-up; canvas Y increases downward, so:
+  //   fanDx = sin(deg),  fanDy = -cos(deg)   (standard CW rotation from -Y axis)
+  const fanBoostByOpening = new Map<string, number>()
+  for (const fan of project.fans ?? []) {
+    if (!fan.isOn || fan.kind === 'box' || fan.directionDeg == null) continue
+    const ri = roomIndex.get(fan.roomId)
+    if (ri == null) continue
+    const dirRad = (fan.directionDeg * Math.PI) / 180
+    const fanDx = Math.sin(dirRad)
+    const fanDy = -Math.cos(dirRad)
+    const baseFlow = fan.kind === 'ceiling' ? FAN_FLOW_CEILING : FAN_FLOW_STANDING
+    const centroid = roomCentroids[ri]
+    for (const wall of project.walls) {
+      const wallRi = sideRoomIndex(wall.sideA, roomIndex) ?? sideRoomIndex(wall.sideB, roomIndex)
+      if (wallRi !== ri) continue
+      // Compute outward wall normal from this room.
+      const wdx = wall.b.x - wall.a.x
+      const wdy = wall.b.y - wall.a.y
+      const wlen = Math.hypot(wdx, wdy) || 1
+      let nx = -wdy / wlen
+      let ny =  wdx / wlen
+      const mx = (wall.a.x + wall.b.x) / 2
+      const my = (wall.a.y + wall.b.y) / 2
+      if ((mx - centroid.x) * nx + (my - centroid.y) * ny < 0) { nx = -nx; ny = -ny }
+      const alignment = fanDx * nx + fanDy * ny
+      if (alignment <= 0.25) continue  // fan not aimed within 75° of this wall
+      for (const o of project.openings) {
+        if (o.wallId !== wall.id) continue
+        if (!o.isOpen && !o.autoOpen) continue
+        fanBoostByOpening.set(o.id, (fanBoostByOpening.get(o.id) ?? 0) + baseFlow * alignment)
+      }
+    }
+  }
 
   // ── Fans ──────────────────────────────────────────────────────────────────
   // Map opening id → forced flow rate for active box fans.
@@ -321,6 +378,7 @@ export function simulate(project: Project): SimResult {
           crossVentBoost: boost,
           breezeFactor,
           forcedFlowM3S: forcedFlow,
+          fanBoostM3S: fanBoostByOpening.get(o.id),
           autoOpen: o.autoOpen,
           closedG: o.autoOpen ? uOpening * area : undefined,
         })
