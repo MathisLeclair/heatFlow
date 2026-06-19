@@ -373,7 +373,7 @@ export const useProjectStore = create<ProjectState>()(
           id,
           name: name || `Scenario ${s.project.scenarios.length + 1}`,
           openStates: Object.fromEntries(
-            s.project.openings.map((o) => [o.id, o.isOpen]),
+            s.project.openings.map((o) => [o.id, o.autoOpen ? 'auto' : o.isOpen]),
           ),
         })
       })
@@ -385,7 +385,15 @@ export const useProjectStore = create<ProjectState>()(
         const sc = s.project.scenarios.find((x) => x.id === id)
         if (!sc) return
         for (const o of s.project.openings) {
-          if (sc.openStates[o.id] !== undefined) o.isOpen = sc.openStates[o.id]
+          const state = sc.openStates[o.id]
+          if (state === undefined) continue
+          if (state === 'auto') {
+            o.autoOpen = true
+            o.isOpen = false
+          } else {
+            o.autoOpen = false
+            o.isOpen = state
+          }
         }
       }),
 

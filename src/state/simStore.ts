@@ -3,6 +3,7 @@ import * as Comlink from 'comlink'
 import type { Project, Scenario } from '../model/types'
 import type { SimResult } from '../sim/simulate'
 import type { SimWorkerApi } from '../sim/sim.worker'
+import { runOptimizer as runOptimizerAlgo, type OptimizerInventory, type OptimizerResult } from '../optimizer/optimizer'
 
 let workerApi: Comlink.Remote<SimWorkerApi> | null = null
 
@@ -20,11 +21,18 @@ function getWorker(): Comlink.Remote<SimWorkerApi> {
 function applyScenario(project: Project, scenario: Scenario): Project {
   return {
     ...project,
-    openings: project.openings.map((o) => ({
-      ...o,
-      isOpen: scenario.openStates[o.id] ?? o.isOpen,
-    })),
+    openings: project.openings.map((o) => {
+      const state = scenario.openStates[o.id]
+      if (state === undefined) return o
+      if (state === 'auto') return { ...o, autoOpen: true, isOpen: false }
+      return { ...o, autoOpen: false, isOpen: state }
+    }),
   }
+}
+
+interface ScenarioRun {
+  result: SimResult
+  runAt: number
 }
 
 interface SimState {
@@ -41,9 +49,22 @@ interface SimState {
   compLabel: string | null
   compRunning: boolean
   compError: string | null
+  /** Per-scenario simulation results for the Compare tab. */
+  scenarioResults: Record<string, ScenarioRun>
+  /** Scenario IDs currently being computed. */
+  scenarioRunning: Record<string, boolean>
   run: (project: Project) => Promise<void>
   runComparison: (project: Project, scenario: Scenario) => Promise<void>
   clearComparison: () => void
+  runScenario: (project: Project, scenario: Scenario) => Promise<void>
+  runAllScenarios: (project: Project) => Promise<void>
+  clearScenarioResults: () => void
+  optimizerRunning: boolean
+  optimizerProgress: number
+  optimizerResults: OptimizerResult[]
+  optimizerError: string | null
+  runOptimizer: (project: Project, inventory: OptimizerInventory) => Promise<void>
+  clearOptimizer: () => void
   setFrame: (f: number) => void
   setPlaying: (p: boolean) => void
   setSpeed: (s: number) => void
@@ -61,6 +82,12 @@ export const useSimStore = create<SimState>((set, get) => ({
   compLabel: null,
   compRunning: false,
   compError: null,
+  scenarioResults: {},
+  scenarioRunning: {},
+  optimizerRunning: false,
+  optimizerProgress: 0,
+  optimizerResults: [],
+  optimizerError: null,
 
   run: async (project) => {
     set({ running: true, error: null, playing: false })
@@ -84,6 +111,41 @@ export const useSimStore = create<SimState>((set, get) => ({
   },
 
   clearComparison: () => set({ compResult: null, compLabel: null, compError: null }),
+
+  runScenario: async (project, scenario) => {
+    set((s) => ({ scenarioRunning: { ...s.scenarioRunning, [scenario.id]: true } }))
+    try {
+      const derived = applyScenario(project, scenario)
+      const result = await getWorker().run(derived)
+      set((s) => ({
+        scenarioResults: { ...s.scenarioResults, [scenario.id]: { result, runAt: Date.now() } },
+        scenarioRunning: { ...s.scenarioRunning, [scenario.id]: false },
+      }))
+    } catch {
+      set((s) => ({ scenarioRunning: { ...s.scenarioRunning, [scenario.id]: false } }))
+    }
+  },
+
+  runAllScenarios: async (project) => {
+    const { scenarios } = project
+    await Promise.all(scenarios.map((sc) => get().runScenario(project, sc)))
+  },
+
+  clearScenarioResults: () => set({ scenarioResults: {}, scenarioRunning: {} }),
+
+  runOptimizer: async (project, inventory) => {
+    set({ optimizerRunning: true, optimizerProgress: 0, optimizerError: null, optimizerResults: [] })
+    try {
+      const results = await runOptimizerAlgo(project, inventory, (p) => {
+        set({ optimizerProgress: p })
+      })
+      set({ optimizerResults: results, optimizerRunning: false, optimizerProgress: 1 })
+    } catch (e) {
+      set({ optimizerRunning: false, optimizerError: e instanceof Error ? e.message : String(e) })
+    }
+  },
+
+  clearOptimizer: () => set({ optimizerResults: [], optimizerError: null, optimizerProgress: 0 }),
 
   setFrame: (frame) => {
     const result = get().result

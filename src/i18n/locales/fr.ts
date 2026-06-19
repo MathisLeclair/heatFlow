@@ -1,5 +1,5 @@
 const fr = {
-  mode: { edit: 'Éditer', simulate: 'Simuler' },
+  mode: { edit: 'Éditer', simulate: 'Simuler', compare: 'Comparer' },
   header: {
     sample: 'Exemple',
     blank: 'Vide',
@@ -49,6 +49,9 @@ const fr = {
     closeAll: 'Tout fermer',
     window: 'Fenêtre',
     door: 'Porte',
+    stateClosed: 'Fermée',
+    stateOpen: 'Ouverte',
+    stateAuto: 'Auto (s\'ouvre quand il fait plus frais dehors)',
   },
   properties: {
     nothingSelected:
@@ -142,6 +145,7 @@ const fr = {
     roomCount_one: '{{count}} pièce',
     roomCount_other: '{{count}} pièces',
     roomCountDate: '{{rooms}} · {{date}}{{north}}',
+    overwrite: 'Écraser avec le plan actuel',
     exportTooltip: 'Exporter le projet complet en fichier JSON',
     export: 'Exporter',
     importTooltip: 'Importer un projet depuis un fichier JSON',
@@ -251,6 +255,33 @@ const fr = {
     blowsOut: 'Extrait vers l\'extérieur',
     flowRate: 'Débit (m³/s)',
     blowAngle: 'Direction du souffle',
+  },
+  compare: {
+    noScenarios: 'Enregistrez d\'abord des configurations d\'ouvertures comme Scénarios, puis comparez leurs scores ici.',
+    runAll: 'Lancer tous les scénarios',
+    run: 'Lancer',
+    running: 'Simulation…',
+    clear: 'Effacer les résultats',
+    avgTemp: 'TEMPÉRATURE MOYENNE DES PIÈCES',
+    perRoom: 'PAR PIÈCE',
+  },
+  optimizer: {
+    title: 'Trouver la meilleure config',
+    description: 'Teste automatiquement différentes stratégies d\'ouvertures et placements d\'équipements pour trouver la configuration la plus fraîche.',
+    standingFans: 'Ventilateurs sur pied',
+    boxFans: 'Ventilateurs de fenêtre',
+    portableACs: 'Climatiseurs mobiles',
+    acSize: 'Taille de la clim',
+    acSmall: 'Petite (~1 kW)',
+    acMedium: 'Moyenne (~2 kW)',
+    acLarge: 'Grande (~3,5 kW)',
+    run: 'Trouver la meilleure config',
+    running: 'Test de {{count}} configurations…',
+    noResults: 'Indiquez vos équipements ci-dessus et cliquez sur "Trouver la meilleure config".',
+    apply: 'Appliquer',
+    openAuto: '{{n}} auto',
+    openOpen: '{{n}} ouvertes',
+    openClosed: '{{n}} fermées',
   },
   language: { en: 'English', fr: 'Français' },
 } as const

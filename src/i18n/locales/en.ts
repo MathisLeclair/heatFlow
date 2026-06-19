@@ -1,5 +1,5 @@
 const en = {
-  mode: { edit: 'Edit', simulate: 'Simulate' },
+  mode: { edit: 'Edit', simulate: 'Simulate', compare: 'Compare' },
   header: {
     sample: 'Sample',
     blank: 'Blank',
@@ -47,6 +47,9 @@ const en = {
     closeAll: 'Close all',
     window: 'Window',
     door: 'Door',
+    stateClosed: 'Closed',
+    stateOpen: 'Open',
+    stateAuto: 'Auto (opens when outside is cooler)',
   },
   properties: {
     nothingSelected:
@@ -139,6 +142,7 @@ const en = {
     roomCount_one: '{{count}} room',
     roomCount_other: '{{count}} rooms',
     roomCountDate: '{{rooms}} · {{date}}{{north}}',
+    overwrite: 'Overwrite with current plan',
     exportTooltip: 'Export full project as JSON file',
     export: 'Export',
     importTooltip: 'Import project from JSON file',
@@ -247,6 +251,33 @@ const en = {
     blowsOut: 'Extract out',
     flowRate: 'Flow rate (m³/s)',
     blowAngle: 'Blow direction',
+  },
+  compare: {
+    noScenarios: 'Save opening configurations as Scenarios first, then compare their cooling scores here.',
+    runAll: 'Run all scenarios',
+    run: 'Run',
+    running: 'Running…',
+    clear: 'Clear results',
+    avgTemp: 'AVERAGE ROOM TEMPERATURE',
+    perRoom: 'PER ROOM',
+  },
+  optimizer: {
+    title: 'Find best config',
+    description: 'Automatically test opening strategies and equipment placement to find the coolest configuration.',
+    standingFans: 'Standing fans',
+    boxFans: 'Box fans',
+    portableACs: 'Portable ACs',
+    acSize: 'AC size',
+    acSmall: 'Small (~1 kW)',
+    acMedium: 'Medium (~2 kW)',
+    acLarge: 'Large (~3.5 kW)',
+    run: 'Find best config',
+    running: 'Testing {{count}} configurations…',
+    noResults: 'Enter your available equipment above and click "Find best config".',
+    apply: 'Apply',
+    openAuto: '{{n}} auto',
+    openOpen: '{{n}} open',
+    openClosed: '{{n}} closed',
   },
   language: { en: 'English', fr: 'Français' },
 } as const

@@ -26,6 +26,13 @@ const U_ROOF_INSULATED = 0.35
 const ALPHA_ROOF = 0.75
 /** Interior surface film resistance (m²·K/W), from SURFACE_FILM_R split. */
 const R_INT_FILM = 0.13
+/**
+ * Condenser exhaust airflow of a single-hose portable AC, per watt of cooling
+ * power (m³/s per W). ~0.1 m³/s for a 2 kW unit. This air is dumped outdoors and
+ * must be replaced by hot outside air infiltrating the room — the well-known
+ * single-hose efficiency penalty.
+ */
+const AC_EXHAUST_FLOW_PER_W = 5e-5
 
 export interface SimResult {
   /** Timestamps in hours from start. */
@@ -195,12 +202,16 @@ export function simulate(project: Project): SimResult {
   }
 
   // ── Portable ACs ──────────────────────────────────────────────────────────
-  // Per-room constant heat removal (W) from active AC units.
+  // Per-room rated heat removal (W) and condenser exhaust airflow (m³/s).
   const acCoolingW = new Array<number>(n).fill(0)
+  const acExhaustFlow = new Array<number>(n).fill(0)
   for (const ac of project.portableACs ?? []) {
     if (!ac.isOn) continue
     const ri = roomIndex.get(ac.roomId)
-    if (ri != null) acCoolingW[ri] += ac.coolingPowerW
+    if (ri != null) {
+      acCoolingW[ri] += ac.coolingPowerW
+      acExhaustFlow[ri] += ac.coolingPowerW * AC_EXHAUST_FLOW_PER_W
+    }
   }
 
   // ── Housing type ──────────────────────────────────────────────────────────
@@ -213,10 +224,34 @@ export function simulate(project: Project): SimResult {
   // Floor area per room (m²) — used for roof and ground coupling.
   const floorArea = rooms.map((r) => polygonArea(r.polygon))
 
+  // ── Portable AC exhaust windows ────────────────────────────────────────────
+  // Each active portable AC needs one exterior opening as an exhaust port.
+  // That opening is physically blocked by the exhaust hose: it cannot ventilate.
+  // We pick the largest available exterior opening that is open/auto in that room.
+  const acExhaustOpeningIds = new Set<string>()
+  for (const ac of project.portableACs ?? []) {
+    if (!ac.isOn) continue
+    const ri = roomIndex.get(ac.roomId)
+    if (ri == null) continue
+    let best: { id: string; area: number } | null = null
+    for (const o of project.openings) {
+      if (!o.isOpen && !o.autoOpen) continue
+      const wall = project.walls.find((w) => w.id === o.wallId)
+      if (!wall?.exterior) continue
+      const wallRi = sideRoomIndex(wall.sideA, roomIndex) ?? sideRoomIndex(wall.sideB, roomIndex)
+      if (wallRi !== ri) continue
+      const area = o.widthM * o.heightM
+      if (!best || area > best.area) best = { id: o.id, area }
+    }
+    if (best) acExhaustOpeningIds.add(best.id)
+  }
+
   // Count open exterior openings per room for the cross-ventilation boost.
+  // Exhaust openings are excluded — they are blocked and don't contribute to cross-vent.
   const openExtCount = new Array<number>(n).fill(0)
   for (const o of project.openings) {
     if (!o.isOpen && !o.autoOpen) continue
+    if (acExhaustOpeningIds.has(o.id)) continue
     const wall = project.walls.find((w) => w.id === o.wallId)
     if (!wall || !wall.exterior) continue
     const ri = sideRoomIndex(wall.sideA, roomIndex) ?? sideRoomIndex(wall.sideB, roomIndex)
@@ -270,7 +305,8 @@ export function simulate(project: Project): SimResult {
     for (const o of wallOpenings) {
       const area = o.widthM * o.heightM
       const uOpening = openingPresetById(o.presetId).uValue
-      if (o.isOpen || o.autoOpen) {
+      const isExhaust = acExhaustOpeningIds.has(o.id)
+      if ((o.isOpen || o.autoOpen) && !isExhaust) {
         const ventRoom = ai ?? (bi as number)
         const boost = openExtCount[ventRoom] >= 2 ? CROSS_VENT_BOOST : 1
         const forcedFlow = forcedFlowByOpening.get(o.id)
@@ -289,6 +325,7 @@ export function simulate(project: Project): SimResult {
           closedG: o.autoOpen ? uOpening * area : undefined,
         })
       } else {
+        // Closed, or open but blocked by AC exhaust hose → conduction only.
         solidEdges.push({
           a: ai ?? (bi as number),
           b: ai != null && bi != null ? bi : -1,
@@ -448,13 +485,27 @@ export function simulate(project: Project): SimResult {
       }
     }
 
-    // Portable AC: constant heat removal from room air.
+    const tOutside = globalZone ? zoneTempAt(globalZone, localHour) : 30
+
+    // Portable AC: proportional cooling toward comfortTempC (the setpoint).
+    // Full rated power when room is ≥2°C above setpoint; tapers linearly to zero
+    // at the setpoint so the room never overcools below the target.
+    // A single-hose unit also exhausts air outdoors while running, drawing an
+    // equal volume of (usually hot) outside air back into the room — a real
+    // penalty that grows with the indoor/outdoor temperature gap.
     for (let i = 0; i < n; i++) {
-      if (acCoolingW[i] > 0) net[i] -= acCoolingW[i]
+      if (acCoolingW[i] > 0) {
+        const load = Math.min(1, Math.max(0, (T[i] - project.comfortTempC) / 2))
+        if (load > 0) {
+          net[i] -= acCoolingW[i] * load
+          const g = AIR_DENSITY * AIR_CP * acExhaustFlow[i] * load
+          net[i] += g * (tOutside - T[i])
+          gSum[i] += g
+        }
+      }
     }
 
     // Housing type: roof and ground-slab coupling.
-    const tOutside = globalZone ? zoneTempAt(globalZone, localHour) : 30
     if (hasRoof) {
       const elevRad = (sunElev * Math.PI) / 180
       const iHoriz = sunElev > 0 ? I_DIRECT * Math.sin(elevRad) : 0

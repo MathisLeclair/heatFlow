@@ -47,6 +47,8 @@ import { PropertiesPanel } from '../panels/PropertiesPanel'
 import { SimulatePanel } from '../panels/SimulatePanel'
 import { ScenariosPanel } from '../panels/ScenariosPanel'
 import { LayoutsPanel } from '../panels/LayoutsPanel'
+import { ZoneListPanel } from '../panels/ZoneListPanel'
+import { ComparePanel } from '../panels/ComparePanel'
 import { TempChart } from '../viz/TempChart'
 import { Legend } from '../viz/Legend'
 import { DisclaimerDialog } from './DisclaimerDialog'
@@ -78,9 +80,9 @@ export function AppLayout() {
       square
       elevation={0}
       sx={{
-        width: isMobile ? '100%' : 360,
+        width: isMobile || mode === 'compare' ? '100%' : 360,
         flexShrink: 0,
-        borderLeft: isMobile ? 0 : `1px solid ${theme.palette.divider}`,
+        borderLeft: isMobile || mode === 'compare' ? 0 : `1px solid ${theme.palette.divider}`,
         borderTop: isMobile ? `1px solid ${theme.palette.divider}` : 0,
         overflowY: 'auto',
       }}
@@ -100,7 +102,7 @@ export function AppLayout() {
             <LayoutsPanel />
           </PanelSection>
         </Stack>
-      ) : (
+      ) : mode === 'simulate' ? (
         <Stack divider={<Divider />}>
           <SimulatePanel />
           <PanelSection title={t('panel.scenarios')}>
@@ -112,6 +114,8 @@ export function AppLayout() {
             </Box>
           </PanelSection>
         </Stack>
+      ) : (
+        <ComparePanel />
       )}
     </Paper>
   )
@@ -161,6 +165,9 @@ export function AppLayout() {
             </ToggleButton>
             <ToggleButton value="simulate" disableRipple>
               {t('mode.simulate')}
+            </ToggleButton>
+            <ToggleButton value="compare" disableRipple>
+              {t('mode.compare')}
             </ToggleButton>
           </ToggleButtonGroup>
 
@@ -241,8 +248,15 @@ export function AppLayout() {
           flexDirection: isMobile ? 'column' : 'row',
         }}
       >
-        {/* Canvas column */}
-        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* Canvas column — hidden in compare mode but kept mounted so ResizeObserver stays alive */}
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            display: mode === 'compare' ? 'none' : 'flex',
+            flexDirection: 'column',
+          }}
+        >
           <Box
             ref={canvasRef}
             sx={{
@@ -660,6 +674,8 @@ function OutsideEnvSection() {
           {t('outside.compassHint')}
         </Typography>
       </Stack>
+      <Divider />
+      <ZoneListPanel />
     </Stack>
   )
 }
@@ -678,9 +694,20 @@ function OpeningsListSection() {
     )
   }
 
+  function openingState(o: { isOpen: boolean; autoOpen?: boolean }): 'open' | 'auto' | 'closed' {
+    if (o.autoOpen) return 'auto'
+    return o.isOpen ? 'open' : 'closed'
+  }
+
+  function applyState(id: string, state: 'open' | 'auto' | 'closed') {
+    if (state === 'auto') updateOpening(id, { autoOpen: true, isOpen: false })
+    else if (state === 'open') updateOpening(id, { autoOpen: false, isOpen: true })
+    else updateOpening(id, { autoOpen: false, isOpen: false })
+  }
+
   return (
     <Stack spacing={1}>
-      <Stack direction="row" spacing={1}>
+      <Stack direction="row" spacing={1} alignItems="center">
         <Button size="small" onClick={() => setAllOpen(true)}>
           {t('openings.openAll')}
         </Button>
@@ -688,26 +715,39 @@ function OpeningsListSection() {
           {t('openings.closeAll')}
         </Button>
       </Stack>
-      <List dense disablePadding sx={{ maxHeight: 200, overflow: 'auto' }}>
+      <List dense disablePadding>
         {project.openings.map((o) => {
           const wall = project.walls.find((w) => w.id === o.wallId)
           const roomName = wall ? roomNameForWall(project, wall) : ''
+          const state = openingState(o)
           return (
             <ListItem
               key={o.id}
               disableGutters
               secondaryAction={
-                <Switch
-                  edge="end"
+                <ToggleButtonGroup
+                  exclusive
                   size="small"
-                  checked={o.isOpen}
-                  onChange={(e) => updateOpening(o.id, { isOpen: e.target.checked })}
-                />
+                  value={state}
+                  onChange={(_, v) => v && applyState(o.id, v)}
+                  sx={{ '& .MuiToggleButton-root': { py: 0.25, px: 0.75, fontSize: 11 } }}
+                >
+                  <Tooltip title={t('openings.stateClosed')}>
+                    <ToggleButton value="closed">—</ToggleButton>
+                  </Tooltip>
+                  <Tooltip title={t('openings.stateOpen')}>
+                    <ToggleButton value="open">✓</ToggleButton>
+                  </Tooltip>
+                  <Tooltip title={t('openings.stateAuto')}>
+                    <ToggleButton value="auto">⟳</ToggleButton>
+                  </Tooltip>
+                </ToggleButtonGroup>
               }
             >
               <ListItemText
                 primary={`${o.kind === 'window' ? t('openings.window') : t('openings.door')} · ${roomName}`}
                 primaryTypographyProps={{ variant: 'body2' }}
+                sx={{ pr: 14 }}
               />
             </ListItem>
           )

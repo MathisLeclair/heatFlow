@@ -12,7 +12,7 @@ export type Selection =
   | { type: 'ac'; id: Id }
   | null
 
-export type Mode = 'edit' | 'simulate'
+export type Mode = 'edit' | 'simulate' | 'compare'
 export type ThemeMode = 'dark' | 'light'
 
 function loadTheme(): ThemeMode {

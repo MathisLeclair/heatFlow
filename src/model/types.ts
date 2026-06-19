@@ -108,12 +108,16 @@ export interface Opening {
   autoOpen?: boolean
 }
 
-/** A saved open/closed configuration the user can compare. */
+/** A saved open/closed/auto configuration the user can compare. */
 export interface Scenario {
   id: Id
   name: string
-  /** openingId -> isOpen */
-  openStates: Record<Id, boolean>
+  /**
+   * openingId -> opening state.
+   * true = open, false = closed, 'auto' = smart auto-open.
+   * Legacy saved scenarios only have booleans; new ones may include 'auto'.
+   */
+  openStates: Record<Id, boolean | 'auto'>
 }
 
 export type FanKind = 'ceiling' | 'standing' | 'box'

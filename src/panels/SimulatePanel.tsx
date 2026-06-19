@@ -15,15 +15,18 @@ import {
   MenuItem,
   IconButton,
   Tooltip,
+  Fab,
 } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import LightbulbIcon from '@mui/icons-material/Lightbulb'
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows'
 import CloseIcon from '@mui/icons-material/Close'
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
 import { useTranslation } from 'react-i18next'
 import { useProjectStore } from '../state/projectStore'
 import { useSimStore } from '../state/simStore'
 import { coolingHints } from '../sim/hints'
+import { OptimizerDialog } from './OptimizerDialog'
 
 function scoreColor(score: number): string {
   return score < 5
@@ -100,6 +103,7 @@ export function SimulatePanel() {
   const clearComparison = useSimStore((s) => s.clearComparison)
 
   const [selectedScenarioId, setSelectedScenarioId] = useState<string>('')
+  const [optimizerOpen, setOptimizerOpen] = useState(false)
 
   const hints = useMemo(
     () => (result ? coolingHints(project, result) : []),
@@ -112,17 +116,31 @@ export function SimulatePanel() {
   const scenarios = project.scenarios ?? []
 
   return (
+    <Box sx={{ position: 'relative' }}>
     <Stack spacing={2} sx={{ p: 2 }}>
-      <Button
-        variant="contained"
-        onClick={() => run(project)}
-        disabled={running}
-        startIcon={
-          running ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />
-        }
-      >
-        {running ? t('simulate.running') : result ? t('simulate.rerun') : t('simulate.run')}
-      </Button>
+      <Stack direction="row" spacing={1} alignItems="stretch">
+        <Button
+          variant="contained"
+          sx={{ flex: 1 }}
+          onClick={() => run(project)}
+          disabled={running}
+          startIcon={
+            running ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />
+          }
+        >
+          {running ? t('simulate.running') : result ? t('simulate.rerun') : t('simulate.run')}
+        </Button>
+        <Tooltip title={t('optimizer.title')}>
+          <Fab
+            size="small"
+            color="secondary"
+            onClick={() => setOptimizerOpen(true)}
+            sx={{ flexShrink: 0, width: 40, height: 40 }}
+          >
+            <AutoFixHighIcon fontSize="small" />
+          </Fab>
+        </Tooltip>
+      </Stack>
 
       {error && <Alert severity="error">{error}</Alert>}
 
@@ -224,5 +242,7 @@ export function SimulatePanel() {
         </>
       )}
     </Stack>
+    <OptimizerDialog open={optimizerOpen} onClose={() => setOptimizerOpen(false)} />
+    </Box>
   )
 }

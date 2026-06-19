@@ -22,6 +22,8 @@ export function loadProject(): Project | null {
     for (const o of p.openings) {
       if (!o.sizePresetId) o.sizePresetId = 'win-sz-standard'
     }
+    // Migrate projects saved before scenarios were added.
+    if (!p.scenarios) p.scenarios = []
     return p
   } catch {
     return null

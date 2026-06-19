@@ -15,6 +15,7 @@ import {
 } from '@mui/material'
 import SaveIcon from '@mui/icons-material/Save'
 import DeleteIcon from '@mui/icons-material/Delete'
+import UpdateIcon from '@mui/icons-material/SystemUpdateAlt'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import FileUploadIcon from '@mui/icons-material/FileUpload'
 import { nanoid } from 'nanoid'
@@ -61,7 +62,24 @@ export function LayoutsPanel() {
   }
 
   function load(entry: LayoutSave) {
-    setProject(entry.project)
+    // Preserve scenarios — they're independent of the floor plan geometry.
+    setProject({ ...entry.project, scenarios: project.scenarios })
+  }
+
+  function overwrite(id: string) {
+    const next = layouts.map((l) =>
+      l.id !== id
+        ? l
+        : {
+            ...l,
+            savedAt: Date.now(),
+            roomCount: project.rooms.length,
+            northAngle: project.northAngle ?? 0,
+            project,
+          },
+    )
+    setLayouts(next)
+    persistLayouts(next)
   }
 
   function remove(id: string) {
@@ -111,9 +129,16 @@ export function LayoutsPanel() {
               key={entry.id}
               disableGutters
               secondaryAction={
-                <IconButton size="small" edge="end" onClick={() => remove(entry.id)}>
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
+                <Stack direction="row">
+                  <Tooltip title={t('layouts.overwrite')}>
+                    <IconButton size="small" onClick={() => overwrite(entry.id)}>
+                      <UpdateIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <IconButton size="small" edge="end" onClick={() => remove(entry.id)}>
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
               }
             >
               <ListItemButton onClick={() => load(entry)} sx={{ borderRadius: 1 }}>
