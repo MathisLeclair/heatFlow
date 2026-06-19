@@ -81,6 +81,10 @@ interface VentEdge {
   breezeFactor: number
   /** When set, a box fan forces this exact flow rate (m³/s) regardless of stack/breeze. */
   forcedFlowM3S?: number
+  /** When true, open/close decision is made each step: open iff outside < room. */
+  autoOpen?: boolean
+  /** Conductance (W/K) to use when autoOpen edge is in its "closed" state. */
+  closedG?: number
 }
 
 /** Volumetric exchange flow through an open aperture (m³/s). */
@@ -212,7 +216,7 @@ export function simulate(project: Project): SimResult {
   // Count open exterior openings per room for the cross-ventilation boost.
   const openExtCount = new Array<number>(n).fill(0)
   for (const o of project.openings) {
-    if (!o.isOpen) continue
+    if (!o.isOpen && !o.autoOpen) continue
     const wall = project.walls.find((w) => w.id === o.wallId)
     if (!wall || !wall.exterior) continue
     const ri = sideRoomIndex(wall.sideA, roomIndex) ?? sideRoomIndex(wall.sideB, roomIndex)
@@ -265,7 +269,8 @@ export function simulate(project: Project): SimResult {
 
     for (const o of wallOpenings) {
       const area = o.widthM * o.heightM
-      if (o.isOpen) {
+      const uOpening = openingPresetById(o.presetId).uValue
+      if (o.isOpen || o.autoOpen) {
         const ventRoom = ai ?? (bi as number)
         const boost = openExtCount[ventRoom] >= 2 ? CROSS_VENT_BOOST : 1
         const forcedFlow = forcedFlowByOpening.get(o.id)
@@ -280,9 +285,10 @@ export function simulate(project: Project): SimResult {
           crossVentBoost: boost,
           breezeFactor,
           forcedFlowM3S: forcedFlow,
+          autoOpen: o.autoOpen,
+          closedG: o.autoOpen ? uOpening * area : undefined,
         })
       } else {
-        const uOpening = openingPresetById(o.presetId).uValue
         solidEdges.push({
           a: ai ?? (bi as number),
           b: ai != null && bi != null ? bi : -1,
@@ -403,6 +409,19 @@ export function simulate(project: Project): SimResult {
     for (const e of ventEdges) {
       const ta = T[e.a]
       const tb = e.b >= 0 ? T[e.b] : zoneTempNow(e.zoneId, hour)
+
+      // Auto-open: only ventilate when outside is cooler than room.
+      if (e.autoOpen && tb >= ta) {
+        // Treat as closed: apply conduction through the closed glazing.
+        if (e.closedG) {
+          const q = e.closedG * (tb - ta)
+          net[e.a] += q
+          gSum[e.a] += e.closedG
+          if (e.b >= 0) { net[e.b] -= q; gSum[e.b] += e.closedG }
+        }
+        continue
+      }
+
       const vdot = ventFlow(e, ta, tb)
       const g = AIR_DENSITY * AIR_CP * vdot
       const q = g * (tb - ta)
@@ -496,6 +515,12 @@ export function simulate(project: Project): SimResult {
       }
       const ta = T[e.a]
       const tb = e.b >= 0 ? T[e.b] : zoneTempAt(zoneById.get(e.zoneId!)!, hour)
+      // Auto-open: report 0 flow when the rule keeps it closed.
+      if (e.autoOpen && tb >= ta) {
+        flowRow.push(0)
+        dirRow.push(0)
+        continue
+      }
       flowRow.push(ventFlow(e, ta, tb))
       // Arrow points toward the warmer side (cool air displaces warm).
       dirRow.push(Math.sign(ta - tb) || 0)

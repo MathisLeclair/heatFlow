@@ -100,6 +100,12 @@ export interface Opening {
   sillHeightM: number
   /** Whether the opening is currently open (lets air through) in this scenario. */
   isOpen: boolean
+  /**
+   * When true the simulation dynamically opens/closes this opening each step:
+   * open when outside temperature < room temperature, closed otherwise.
+   * Overrides `isOpen` during simulation when active.
+   */
+  autoOpen?: boolean
 }
 
 /** A saved open/closed configuration the user can compare. */

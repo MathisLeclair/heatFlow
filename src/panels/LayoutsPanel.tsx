@@ -51,6 +51,7 @@ export function LayoutsPanel() {
       name: label,
       savedAt: Date.now(),
       roomCount: project.rooms.length,
+      northAngle: project.northAngle ?? 0,
       project,
     }
     const next = [entry, ...layouts]
@@ -121,6 +122,7 @@ export function LayoutsPanel() {
                   secondary={t('layouts.roomCountDate', {
                     rooms: t('layouts.roomCount', { count: entry.roomCount }),
                     date: formatDate(entry.savedAt),
+                    north: entry.northAngle != null ? ` · ${Math.round(entry.northAngle)}° N` : '',
                   })}
                   slotProps={{
                     primary: { variant: 'body2' },

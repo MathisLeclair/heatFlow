@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import * as Comlink from 'comlink'
-import type { Project } from '../model/types'
+import type { Project, Scenario } from '../model/types'
 import type { SimResult } from '../sim/simulate'
 import type { SimWorkerApi } from '../sim/sim.worker'
 
@@ -16,6 +16,17 @@ function getWorker(): Comlink.Remote<SimWorkerApi> {
   return workerApi
 }
 
+/** Apply a saved scenario's open states to a project copy. */
+function applyScenario(project: Project, scenario: Scenario): Project {
+  return {
+    ...project,
+    openings: project.openings.map((o) => ({
+      ...o,
+      isOpen: scenario.openStates[o.id] ?? o.isOpen,
+    })),
+  }
+}
+
 interface SimState {
   result: SimResult | null
   running: boolean
@@ -25,7 +36,14 @@ interface SimState {
   playing: boolean
   /** Playback speed multiplier. */
   speed: number
+  /** Optional comparison run (a second scenario overlaid in the chart). */
+  compResult: SimResult | null
+  compLabel: string | null
+  compRunning: boolean
+  compError: string | null
   run: (project: Project) => Promise<void>
+  runComparison: (project: Project, scenario: Scenario) => Promise<void>
+  clearComparison: () => void
   setFrame: (f: number) => void
   setPlaying: (p: boolean) => void
   setSpeed: (s: number) => void
@@ -39,6 +57,10 @@ export const useSimStore = create<SimState>((set, get) => ({
   frame: 0,
   playing: false,
   speed: 1,
+  compResult: null,
+  compLabel: null,
+  compRunning: false,
+  compError: null,
 
   run: async (project) => {
     set({ running: true, error: null, playing: false })
@@ -50,6 +72,19 @@ export const useSimStore = create<SimState>((set, get) => ({
     }
   },
 
+  runComparison: async (project, scenario) => {
+    set({ compRunning: true, compError: null })
+    try {
+      const derived = applyScenario(project, scenario)
+      const compResult = await getWorker().run(derived)
+      set({ compResult, compLabel: scenario.name, compRunning: false })
+    } catch (e) {
+      set({ compRunning: false, compError: e instanceof Error ? e.message : String(e) })
+    }
+  },
+
+  clearComparison: () => set({ compResult: null, compLabel: null, compError: null }),
+
   setFrame: (frame) => {
     const result = get().result
     if (!result) return
@@ -58,5 +93,5 @@ export const useSimStore = create<SimState>((set, get) => ({
 
   setPlaying: (playing) => set({ playing }),
   setSpeed: (speed) => set({ speed }),
-  clear: () => set({ result: null, frame: 0, playing: false, error: null }),
+  clear: () => set({ result: null, frame: 0, playing: false, error: null, compResult: null, compLabel: null }),
 }))

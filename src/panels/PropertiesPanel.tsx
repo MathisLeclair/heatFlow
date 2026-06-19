@@ -574,11 +574,31 @@ function OpeningEditor({ opening }: { opening: Opening }) {
         control={
           <Switch
             checked={opening.isOpen}
+            disabled={!!opening.autoOpen}
             onChange={(e) => updateOpening(opening.id, { isOpen: e.target.checked })}
           />
         }
         label={opening.isOpen ? t('opening.isOpen') : t('opening.isClosed')}
       />
+      <FormControlLabel
+        control={
+          <Switch
+            checked={!!opening.autoOpen}
+            onChange={(e) => updateOpening(opening.id, { autoOpen: e.target.checked })}
+            size="small"
+          />
+        }
+        label={
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <span>{t('opening.autoOpen')}</span>
+          </Stack>
+        }
+      />
+      {opening.autoOpen && (
+        <Typography variant="caption" color="text.secondary">
+          {t('opening.autoOpenHint')}
+        </Typography>
+      )}
       <TextField
         select
         size="small"

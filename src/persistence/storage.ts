@@ -8,6 +8,8 @@ export interface LayoutSave {
   name: string
   savedAt: number   // Date.now()
   roomCount: number
+  /** North angle in degrees (CW from canvas-up) at save time — for display only. */
+  northAngle?: number
   project: Project
 }
 

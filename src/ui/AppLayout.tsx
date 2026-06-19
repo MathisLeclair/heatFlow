@@ -256,7 +256,7 @@ export function AppLayout() {
             {mode === 'edit' && <ToolPaletteOverlay />}
             {mode === 'simulate' && result && <SimHUD />}
             {mode === 'simulate' && <Legend />}
-            <NorthArrowOverlay />
+            {mode === 'edit' && <NorthArrowOverlay />}
           </Box>
           {mode === 'simulate' && <TimelineBar />}
         </Box>

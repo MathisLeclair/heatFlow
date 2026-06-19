@@ -94,6 +94,8 @@ const fr = {
     sillHeight: "Hauteur de l'appui (m)",
     positionAlongWall: 'Position le long du mur',
     delete: "Supprimer l'ouverture",
+    autoOpen: 'Ouverture intelligente (auto)',
+    autoOpenHint: "S'ouvre automatiquement quand il fait plus frais dehors que dans la pièce ; se referme sinon.",
   },
   zone: {
     titleGlobal: 'Zone extérieure (globale)',
@@ -121,6 +123,11 @@ const fr = {
     coolingScoreHelper:
       "Plus c'est bas, mieux c'est — degrés-heures moyens au-dessus de {{temp}}°C.",
     suggestions: 'Suggestions',
+    compareTitle: 'Comparer avec un scénario',
+    compareScenario: 'Scénario',
+    compareRun: 'Comparer',
+    compareClear: 'Effacer la comparaison',
+    compareNoScenarios: 'Enregistrez des configurations d\'ouvertures comme Scénarios pour les comparer ici.',
   },
   scenarios: {
     placeholder: 'ex. Ventilation nocturne',
@@ -134,7 +141,7 @@ const fr = {
     hint: "Enregistrez le plan actuel pour rappeler différentes configurations de pièces indépendamment des scénarios d'ouvertures.",
     roomCount_one: '{{count}} pièce',
     roomCount_other: '{{count}} pièces',
-    roomCountDate: '{{rooms}} · {{date}}',
+    roomCountDate: '{{rooms}} · {{date}}{{north}}',
     exportTooltip: 'Exporter le projet complet en fichier JSON',
     export: 'Exporter',
     importTooltip: 'Importer un projet depuis un fichier JSON',
