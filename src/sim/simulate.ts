@@ -201,6 +201,9 @@ export function simulate(project: Project): SimResult {
   const startHour = project.startHour ?? 6
   const globalZone = project.outsideZones.find((z) => z.kind === 'global')
 
+  // Precompute room centroids for outward-normal detection (used in fan boost + solar below).
+  const roomCentroids = rooms.map((r) => polygonCentroid(r.polygon))
+
   // ── Directed fan airflow boost ────────────────────────────────────────────
   // Standing/ceiling fans with a set direction push extra air through any open
   // opening whose wall normal aligns with the fan's blow direction.
@@ -320,9 +323,6 @@ export function simulate(project: Project): SimResult {
   const ventEdges: VentEdge[] = []
   const solarWalls: SolarWall[] = []
   const solarOpenings: SolarOpening[] = []
-
-  // Precompute room centroids for outward-normal detection.
-  const roomCentroids = rooms.map((r) => polygonCentroid(r.polygon))
 
   for (const wall of project.walls) {
     const ai = sideRoomIndex(wall.sideA, roomIndex)

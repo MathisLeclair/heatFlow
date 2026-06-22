@@ -220,7 +220,7 @@ export function ComparePanel() {
           const openCount = Object.values(sc.openStates).filter(Boolean).length
 
           return (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={sc.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={sc.id}>
               {run ? (
                 <Box
                   sx={{
